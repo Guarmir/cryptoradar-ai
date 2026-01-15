@@ -50,6 +50,8 @@ def get_score(coin: str):
     result = calculate_score(coin)
 
     if result is None:
-        return {"error": "Moeda não encontrada"}
+        return {
+            "error": "Dados indisponíveis no momento. Tente novamente em instantes."
+        }
 
     return result
