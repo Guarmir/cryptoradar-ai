@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 import threading
 
@@ -6,6 +7,15 @@ from app.services.price_alert import monitor_price
 from app.services.score import calculate_score
 
 app = FastAPI(title="CryptoRadar AI")
+
+# 🔓 LIBERAR CORS (OBRIGATÓRIO PARA FRONTEND / APP)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # depois podemos restringir
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -17,7 +27,7 @@ def home():
 def get_price(coin: str):
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {"ids": coin, "vs_currencies": "usd"}
-    response = requests.get(url, params=params)
+    response = requests.get(url, params=params, timeout=10)
     data = response.json()
 
     if coin not in data:
