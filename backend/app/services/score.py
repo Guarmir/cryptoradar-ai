@@ -1,6 +1,20 @@
 import requests
+import time
+
+# CACHE EM MEMÓRIA
+CACHE = {}
+CACHE_TTL = 300  # 5 minutos
+
 
 def calculate_score(coin: str):
+    now = time.time()
+
+    # 🔁 1) VERIFICAR CACHE
+    if coin in CACHE:
+        cached = CACHE[coin]
+        if now - cached["timestamp"] < CACHE_TTL:
+            return cached["data"]
+
     try:
         url = "https://api.coingecko.com/api/v3/coins/markets"
         params = {
@@ -74,17 +88,25 @@ def calculate_score(coin: str):
         else:
             signal = "🔴 Fraco / risco alto"
 
-        return {
+        result = {
             "coin": coin,
             "price_usd": price,
             "change_24h": round(change_24h, 2),
             "volume_24h": volume,
             "market_cap": market_cap,
             "score": score,
-            "signal": signal
+            "signal": signal,
+            "cached": False
         }
 
+        # 💾 2) SALVAR NO CACHE
+        CACHE[coin] = {
+            "data": {**result, "cached": True},
+            "timestamp": now
+        }
+
+        return result
+
     except Exception as e:
-        # Log simples para produção
         print("Erro no score:", e)
         return None
