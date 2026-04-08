@@ -7,7 +7,7 @@ import time
 from app.services.price_alert import monitor_price
 from app.services.score import calculate_score
 
-app = FastAPI(title="CryptoRadar AI")
+app = FastAPI(title="CryptoRadar AI", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,10 +24,12 @@ coin_list_cache = {
     "timestamp": 0
 }
 
+market_cache = {}
 chart_cache = {}
 
-COIN_LIST_TTL = 60 * 60   # 1 hora
-CHART_TTL = 60 * 5        # 5 minutos
+COIN_LIST_TTL = 60 * 60      # 1 hora
+MARKET_TTL = 60              # 1 minuto
+CHART_TTL = 60 * 5           # 5 minutos
 
 
 def get_cached(cache_dict, key, ttl):
@@ -54,19 +56,27 @@ def get_coin_list():
         return cached
 
     url = f"{COINGECKO_API}/coins/list"
-    response = requests.get(url, timeout=20)
 
-    if response.status_code != 200:
+    try:
+        response = requests.get(url, timeout=20)
+
+        if response.status_code != 200:
+            raise HTTPException(status_code=503, detail="Erro ao buscar lista de moedas.")
+
+        data = response.json()
+        coin_list_cache["data"] = data
+        coin_list_cache["timestamp"] = time.time()
+        return data
+
+    except Exception:
         raise HTTPException(status_code=503, detail="Erro ao buscar lista de moedas.")
-
-    data = response.json()
-    coin_list_cache["data"] = data
-    coin_list_cache["timestamp"] = time.time()
-    return data
 
 
 def resolve_coin_id(user_input: str):
     query = user_input.strip().lower()
+    if not query:
+        return None
+
     coins = get_coin_list()
 
     # 1. match exato por id
@@ -97,6 +107,37 @@ def resolve_coin_id(user_input: str):
     return None
 
 
+def get_market_data(coin_id: str):
+    cached = get_cached(market_cache, coin_id, MARKET_TTL)
+    if cached:
+        return cached
+
+    url = f"{COINGECKO_API}/coins/markets"
+    params = {
+        "vs_currency": "usd",
+        "ids": coin_id,
+        "price_change_percentage": "24h"
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=20)
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+
+        if not data:
+            return None
+
+        market = data[0]
+        set_cached(market_cache, coin_id, market)
+        return market
+
+    except Exception:
+        return None
+
+
 def get_chart_data(coin_id: str, days: int):
     cache_key = f"{coin_id}_{days}"
     cached = get_cached(chart_cache, cache_key, CHART_TTL)
@@ -115,9 +156,7 @@ def get_chart_data(coin_id: str, days: int):
 
         if response.status_code != 200:
             return {
-                "coin_id": coin_id,
-                "days": days,
-                "points": []
+                "prices": []
             }
 
         data = response.json()
@@ -126,15 +165,34 @@ def get_chart_data(coin_id: str, days: int):
 
     except Exception:
         return {
-            "coin_id": coin_id,
-            "days": days,
-            "points": []
+            "prices": []
         }
+
+
+def build_empty_asset_response(original_input: str, days: int = 1):
+    return {
+        "coin": original_input.upper(),
+        "coin_id": None,
+        "name": original_input.capitalize(),
+        "score": None,
+        "signal": "🔴",
+        "price": None,
+        "market_cap": None,
+        "volume": None,
+        "change_24h": None,
+        "image": None,
+        "last_updated": None,
+        "days": days,
+        "points": []
+    }
 
 
 @app.get("/")
 def home():
-    return {"status": "CryptoRadar AI online"}
+    return {
+        "status": "CryptoRadar AI online",
+        "version": "2.0.0"
+    }
 
 
 @app.get("/price/{coin}")
@@ -142,20 +200,28 @@ def get_price(coin: str):
     coin_id = resolve_coin_id(coin)
 
     if not coin_id:
-        return {"error": "Moeda não encontrada"}
+        return {
+            "error": "Moeda não encontrada",
+            "coin": coin.upper(),
+            "coin_id": None,
+            "price_usd": None
+        }
 
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": coin_id, "vs_currencies": "usd"}
-    response = requests.get(url, params=params, timeout=10)
-    data = response.json()
+    market = get_market_data(coin_id)
 
-    if coin_id not in data:
-        return {"error": "Moeda não encontrada"}
+    if not market:
+        return {
+            "error": "Preço indisponível no momento",
+            "coin": coin.upper(),
+            "coin_id": coin_id,
+            "price_usd": None
+        }
 
     return {
-        "coin": coin.upper(),
-        "coin_id": coin_id,
-        "price_usd": data[coin_id]["usd"]
+        "coin": market.get("symbol", coin).upper(),
+        "coin_id": market.get("id"),
+        "name": market.get("name"),
+        "price_usd": market.get("current_price")
     }
 
 
@@ -189,17 +255,46 @@ def get_score(coin: str):
 
     if not coin_id:
         return {
-            "error": "Moeda não encontrada"
+            "error": "Moeda não encontrada",
+            **build_empty_asset_response(coin)
         }
 
-    result = calculate_score(coin_id)
+    market = get_market_data(coin_id)
 
-    if result is None:
+    if not market:
         return {
-            "error": "Dados indisponíveis no momento. Tente novamente em instantes."
+            "error": "Dados indisponíveis no momento. Tente novamente em instantes.",
+            **build_empty_asset_response(coin)
         }
 
-    return result
+    score_result = calculate_score(coin_id)
+
+    if isinstance(score_result, dict):
+        score = score_result.get("score")
+        signal = score_result.get("signal", "🔴")
+    elif isinstance(score_result, (list, tuple)) and len(score_result) >= 2:
+        score = score_result[0]
+        signal = score_result[1]
+    elif score_result is None:
+        score = None
+        signal = "🔴"
+    else:
+        score = None
+        signal = "🔴"
+
+    return {
+        "coin": market.get("symbol", coin).upper(),
+        "coin_id": market.get("id"),
+        "name": market.get("name"),
+        "score": score,
+        "signal": signal,
+        "price": market.get("current_price"),
+        "market_cap": market.get("market_cap"),
+        "volume": market.get("total_volume"),
+        "change_24h": market.get("price_change_percentage_24h"),
+        "image": market.get("image"),
+        "last_updated": market.get("last_updated")
+    }
 
 
 @app.get("/chart/{coin}")
@@ -222,7 +317,7 @@ def get_chart(coin: str, days: int = 1):
 
     points = []
     for item in prices:
-        if len(item) >= 2:
+        if isinstance(item, list) and len(item) >= 2:
             points.append({
                 "timestamp": item[0],
                 "price": item[1]
@@ -231,6 +326,70 @@ def get_chart(coin: str, days: int = 1):
     return {
         "coin": coin.upper(),
         "coin_id": coin_id,
+        "days": days,
+        "points": points
+    }
+
+
+@app.get("/asset/{coin}")
+def get_asset(coin: str, days: int = 1):
+    if days not in [1, 7]:
+        raise HTTPException(status_code=400, detail="Use days=1 ou days=7.")
+
+    coin_id = resolve_coin_id(coin)
+
+    if not coin_id:
+        return {
+            "error": "Moeda não encontrada",
+            **build_empty_asset_response(coin, days)
+        }
+
+    market = get_market_data(coin_id)
+    chart_data = get_chart_data(coin_id, days)
+
+    if not market:
+        return {
+            "error": "Dados indisponíveis no momento. Tente novamente em instantes.",
+            **build_empty_asset_response(coin, days)
+        }
+
+    score_result = calculate_score(coin_id)
+
+    if isinstance(score_result, dict):
+        score = score_result.get("score")
+        signal = score_result.get("signal", "🔴")
+    elif isinstance(score_result, (list, tuple)) and len(score_result) >= 2:
+        score = score_result[0]
+        signal = score_result[1]
+    elif score_result is None:
+        score = None
+        signal = "🔴"
+    else:
+        score = None
+        signal = "🔴"
+
+    prices = chart_data.get("prices", [])
+    points = []
+
+    for item in prices:
+        if isinstance(item, list) and len(item) >= 2:
+            points.append({
+                "timestamp": item[0],
+                "price": item[1]
+            })
+
+    return {
+        "coin": market.get("symbol", coin).upper(),
+        "coin_id": market.get("id"),
+        "name": market.get("name"),
+        "score": score,
+        "signal": signal,
+        "price": market.get("current_price"),
+        "market_cap": market.get("market_cap"),
+        "volume": market.get("total_volume"),
+        "change_24h": market.get("price_change_percentage_24h"),
+        "image": market.get("image"),
+        "last_updated": market.get("last_updated"),
         "days": days,
         "points": points
     }
