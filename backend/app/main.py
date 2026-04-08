@@ -5,9 +5,8 @@ import threading
 import time
 
 from app.services.price_alert import monitor_price
-from app.services.score import calculate_score
 
-app = FastAPI(title="CryptoRadar AI", version="2.0.0")
+app = FastAPI(title="CryptoRadar AI", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,9 +26,44 @@ coin_list_cache = {
 market_cache = {}
 chart_cache = {}
 
-COIN_LIST_TTL = 60 * 60      # 1 hora
-MARKET_TTL = 60              # 1 minuto
-CHART_TTL = 60 * 5           # 5 minutos
+COIN_LIST_TTL = 60 * 60
+MARKET_TTL = 60
+CHART_TTL = 60 * 5
+
+# Aliases prioritários para evitar ambiguidades críticas
+PREFERRED_ALIASES = {
+    "btc": "bitcoin",
+    "xbt": "bitcoin",
+    "bitcoin": "bitcoin",
+    "eth": "ethereum",
+    "ethereum": "ethereum",
+    "sol": "solana",
+    "solana": "solana",
+    "xrp": "ripple",
+    "ripple": "ripple",
+    "ada": "cardano",
+    "cardano": "cardano",
+    "doge": "dogecoin",
+    "dogecoin": "dogecoin",
+    "bnb": "binancecoin",
+    "matic": "matic-network",
+    "avax": "avalanche-2",
+    "link": "chainlink",
+    "dot": "polkadot",
+    "ltc": "litecoin",
+    "trx": "tron",
+    "shib": "shiba-inu",
+    "uni": "uniswap",
+    "atom": "cosmos",
+    "etc": "ethereum-classic",
+    "xlm": "stellar",
+    "bch": "bitcoin-cash",
+    "near": "near",
+    "apt": "aptos",
+    "arb": "arbitrum",
+    "op": "optimism",
+    "pepe": "pepe",
+}
 
 
 def get_cached(cache_dict, key, ttl):
@@ -57,19 +91,15 @@ def get_coin_list():
 
     url = f"{COINGECKO_API}/coins/list"
 
-    try:
-        response = requests.get(url, timeout=20)
+    response = requests.get(url, timeout=20)
 
-        if response.status_code != 200:
-            raise HTTPException(status_code=503, detail="Erro ao buscar lista de moedas.")
-
-        data = response.json()
-        coin_list_cache["data"] = data
-        coin_list_cache["timestamp"] = time.time()
-        return data
-
-    except Exception:
+    if response.status_code != 200:
         raise HTTPException(status_code=503, detail="Erro ao buscar lista de moedas.")
+
+    data = response.json()
+    coin_list_cache["data"] = data
+    coin_list_cache["timestamp"] = time.time()
+    return data
 
 
 def resolve_coin_id(user_input: str):
@@ -77,29 +107,52 @@ def resolve_coin_id(user_input: str):
     if not query:
         return None
 
+    # 1) aliases prioritários primeiro
+    if query in PREFERRED_ALIASES:
+        return PREFERRED_ALIASES[query]
+
     coins = get_coin_list()
 
-    # 1. match exato por id
+    # 2) match exato por id
     for coin in coins:
         if coin["id"].lower() == query:
             return coin["id"]
 
-    # 2. match exato por símbolo
-    exact_symbol_matches = [coin for coin in coins if coin["symbol"].lower() == query]
-    if exact_symbol_matches:
-        return exact_symbol_matches[0]["id"]
-
-    # 3. match exato por nome
+    # 3) match exato por nome
     for coin in coins:
         if coin["name"].lower() == query:
             return coin["id"]
 
-    # 4. match parcial por id
+    # 4) match exato por símbolo
+    exact_symbol_matches = [coin for coin in coins if coin["symbol"].lower() == query]
+    if exact_symbol_matches:
+        # se houver múltiplos, tenta um ativo com nome mais próximo do símbolo
+        if len(exact_symbol_matches) == 1:
+            return exact_symbol_matches[0]["id"]
+
+        preferred_names = {
+            "btc": "bitcoin",
+            "eth": "ethereum",
+            "sol": "solana",
+            "xrp": "ripple",
+            "ada": "cardano",
+            "doge": "dogecoin",
+        }
+
+        preferred_name = preferred_names.get(query)
+        if preferred_name:
+            for coin in exact_symbol_matches:
+                if coin["id"].lower() == preferred_name or coin["name"].lower() == preferred_name:
+                    return coin["id"]
+
+        return exact_symbol_matches[0]["id"]
+
+    # 5) match parcial por id
     for coin in coins:
         if query in coin["id"].lower():
             return coin["id"]
 
-    # 5. match parcial por nome
+    # 6) match parcial por nome
     for coin in coins:
         if query in coin["name"].lower():
             return coin["id"]
@@ -155,18 +208,72 @@ def get_chart_data(coin_id: str, days: int):
         response = requests.get(url, params=params, timeout=20)
 
         if response.status_code != 200:
-            return {
-                "prices": []
-            }
+            return {"prices": []}
 
         data = response.json()
         set_cached(chart_cache, cache_key, data)
         return data
 
     except Exception:
-        return {
-            "prices": []
-        }
+        return {"prices": []}
+
+
+def calculate_score_from_market(market: dict):
+    price_change_24h = market.get("price_change_percentage_24h") or 0
+    market_cap = market.get("market_cap") or 0
+    total_volume = market.get("total_volume") or 0
+    current_price = market.get("current_price") or 0
+
+    score = 50
+
+    # variação 24h
+    if price_change_24h > 8:
+        score += 20
+    elif price_change_24h > 3:
+        score += 12
+    elif price_change_24h > 0:
+        score += 6
+    elif price_change_24h < -8:
+        score -= 20
+    elif price_change_24h < -3:
+        score -= 12
+    elif price_change_24h < 0:
+        score -= 6
+
+    # market cap
+    if market_cap >= 10_000_000_000:
+        score += 12
+    elif market_cap >= 1_000_000_000:
+        score += 8
+    elif market_cap >= 100_000_000:
+        score += 4
+    else:
+        score -= 3
+
+    # volume
+    if total_volume >= 1_000_000_000:
+        score += 10
+    elif total_volume >= 100_000_000:
+        score += 6
+    elif total_volume >= 10_000_000:
+        score += 3
+    else:
+        score -= 4
+
+    # preço apenas como ajuste leve
+    if current_price > 0:
+        score += 1
+
+    score = max(0, min(100, score))
+
+    if score >= 70:
+        signal = "🟢"
+    elif score >= 40:
+        signal = "🟡"
+    else:
+        signal = "🔴"
+
+    return score, signal
 
 
 def build_empty_asset_response(original_input: str, days: int = 1):
@@ -191,7 +298,7 @@ def build_empty_asset_response(original_input: str, days: int = 1):
 def home():
     return {
         "status": "CryptoRadar AI online",
-        "version": "2.0.0"
+        "version": "2.1.0"
     }
 
 
@@ -214,6 +321,7 @@ def get_price(coin: str):
             "error": "Preço indisponível no momento",
             "coin": coin.upper(),
             "coin_id": coin_id,
+            "name": None,
             "price_usd": None
         }
 
@@ -267,20 +375,7 @@ def get_score(coin: str):
             **build_empty_asset_response(coin)
         }
 
-    score_result = calculate_score(coin_id)
-
-    if isinstance(score_result, dict):
-        score = score_result.get("score")
-        signal = score_result.get("signal", "🔴")
-    elif isinstance(score_result, (list, tuple)) and len(score_result) >= 2:
-        score = score_result[0]
-        signal = score_result[1]
-    elif score_result is None:
-        score = None
-        signal = "🔴"
-    else:
-        score = None
-        signal = "🔴"
+    score, signal = calculate_score_from_market(market)
 
     return {
         "coin": market.get("symbol", coin).upper(),
@@ -353,20 +448,7 @@ def get_asset(coin: str, days: int = 1):
             **build_empty_asset_response(coin, days)
         }
 
-    score_result = calculate_score(coin_id)
-
-    if isinstance(score_result, dict):
-        score = score_result.get("score")
-        signal = score_result.get("signal", "🔴")
-    elif isinstance(score_result, (list, tuple)) and len(score_result) >= 2:
-        score = score_result[0]
-        signal = score_result[1]
-    elif score_result is None:
-        score = None
-        signal = "🔴"
-    else:
-        score = None
-        signal = "🔴"
+    score, signal = calculate_score_from_market(market)
 
     prices = chart_data.get("prices", [])
     points = []
