@@ -1,0 +1,15 @@
+# Ambiente virtual
+.venv/
+
+# Variáveis e segredos locais
+.env
+.env.*
+!.env.example
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store
+Thumbs.db
