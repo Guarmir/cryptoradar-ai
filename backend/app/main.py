@@ -491,7 +491,7 @@ def build_empty_asset_response(original_input: str, days: int = 1):
 def home():
     return {
         "status": "CryptoRadar AI online",
-        "version": "2.0.0"
+        "version": "2.1.0"
     }
 
 
