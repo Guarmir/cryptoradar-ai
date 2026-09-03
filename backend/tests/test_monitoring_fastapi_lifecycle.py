@@ -243,6 +243,7 @@ class MainApplicationRegressionTest(
             "/score/{coin}",
             "/chart/{coin}",
             "/asset/{coin}",
+            "/push/devices/register",
         }
 
         self.assertTrue(

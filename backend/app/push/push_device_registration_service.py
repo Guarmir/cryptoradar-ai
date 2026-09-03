@@ -1,0 +1,31 @@
+from app.push.push_device import PushDevice
+from app.push.push_device_store import PushDeviceStore
+
+
+class PushDeviceRegistrationService:
+    def __init__(
+        self,
+        *,
+        store: PushDeviceStore,
+    ):
+        self._store = store
+
+    def register(
+        self,
+        *,
+        installation_id: str,
+        fcm_token: str,
+        platform: str = "android",
+    ) -> PushDevice:
+        device = PushDevice(
+            installation_id=installation_id,
+            fcm_token=fcm_token,
+            platform=platform,
+            enabled=True,
+        )
+
+        self._store.save_device(
+            device,
+        )
+
+        return device

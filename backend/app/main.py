@@ -7,6 +7,11 @@ import time
 from app.monitoring.monitoring_fastapi_lifecycle import (
     monitoring_lifespan,
 )
+from app.push.push_registration_api import (
+    PushDeviceRegistrationRequest,
+    PushDeviceRegistrationResponse,
+    register_push_device,
+)
 from app.services.price_alert import monitor_price
 
 app = FastAPI(
@@ -485,6 +490,19 @@ def build_empty_asset_response(original_input: str, days: int = 1):
         "days": days,
         "points": []
     }
+
+@app.post(
+    "/push/devices/register",
+    response_model=(
+        PushDeviceRegistrationResponse
+    ),
+)
+def register_push_device_endpoint(
+    request: PushDeviceRegistrationRequest,
+):
+    return register_push_device(
+        request,
+    )
 
 
 @app.get("/")
