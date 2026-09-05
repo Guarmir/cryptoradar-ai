@@ -1,3 +1,5 @@
+from typing import Optional
+
 from app.push.push_device import PushDevice
 from app.push.push_device_store import PushDeviceStore
 
@@ -15,11 +17,17 @@ class PushDeviceRegistrationService:
         *,
         installation_id: str,
         fcm_token: str,
+        firebase_installation_id: Optional[
+            str
+        ] = None,
         platform: str = "android",
     ) -> PushDevice:
         device = PushDevice(
             installation_id=installation_id,
             fcm_token=fcm_token,
+            firebase_installation_id=(
+                firebase_installation_id
+            ),
             platform=platform,
             enabled=True,
         )

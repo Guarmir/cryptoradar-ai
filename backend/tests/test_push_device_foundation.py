@@ -27,6 +27,10 @@ class PushDeviceTest(
             "token-a",
         )
 
+        self.assertIsNone(
+            device.firebase_installation_id,
+        )
+
         self.assertEqual(
             device.platform,
             "android",
@@ -62,6 +66,35 @@ class PushDeviceTest(
         self.assertEqual(
             device.platform,
             "android",
+        )
+
+    def test_normalizes_firebase_installation_id(
+        self,
+    ):
+        device = PushDevice(
+            installation_id="installation-a",
+            fcm_token="token-a",
+            firebase_installation_id=(
+                "  firebase-installation-a  "
+            ),
+        )
+
+        self.assertEqual(
+            device.firebase_installation_id,
+            "firebase-installation-a",
+        )
+
+    def test_empty_firebase_installation_id_becomes_none(
+        self,
+    ):
+        device = PushDevice(
+            installation_id="installation-a",
+            fcm_token="token-a",
+            firebase_installation_id="   ",
+        )
+
+        self.assertIsNone(
+            device.firebase_installation_id,
         )
 
     def test_disabled_device_cannot_receive_push(

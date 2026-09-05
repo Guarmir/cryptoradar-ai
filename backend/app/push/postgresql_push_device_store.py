@@ -80,6 +80,7 @@ class PostgreSQLPushDeviceStore(
                     SELECT
                         installation_id,
                         fcm_token,
+                        firebase_installation_id,
                         platform,
                         enabled
                     FROM {self.TABLE_NAME}
@@ -121,6 +122,7 @@ class PostgreSQLPushDeviceStore(
                     SELECT
                         installation_id,
                         fcm_token,
+                        firebase_installation_id,
                         platform,
                         enabled
                     FROM {self.TABLE_NAME}
@@ -161,6 +163,7 @@ class PostgreSQLPushDeviceStore(
                     SELECT
                         installation_id,
                         fcm_token,
+                        firebase_installation_id,
                         platform,
                         enabled
                     FROM {self.TABLE_NAME}
@@ -204,11 +207,13 @@ class PostgreSQLPushDeviceStore(
                         scope_key,
                         installation_id,
                         fcm_token,
+                        firebase_installation_id,
                         platform,
                         enabled,
                         updated_at
                     )
                     VALUES (
+                        %s,
                         %s,
                         %s,
                         %s,
@@ -223,6 +228,8 @@ class PostgreSQLPushDeviceStore(
                     DO UPDATE SET
                         fcm_token =
                             EXCLUDED.fcm_token,
+                        firebase_installation_id =
+                            EXCLUDED.firebase_installation_id,
                         platform =
                             EXCLUDED.platform,
                         enabled =
@@ -234,6 +241,7 @@ class PostgreSQLPushDeviceStore(
                         self._scope_key,
                         device.installation_id,
                         device.fcm_token,
+                        device.firebase_installation_id,
                         device.platform,
                         device.enabled,
                     ),
@@ -349,6 +357,14 @@ class PostgreSQLPushDeviceStore(
     def _device_from_row(
         row: Any,
     ) -> PushDevice:
+        firebase_installation_id = (
+            str(
+                row[2],
+            )
+            if row[2] is not None
+            else None
+        )
+
         return PushDevice(
             installation_id=str(
                 row[0],
@@ -356,11 +372,14 @@ class PostgreSQLPushDeviceStore(
             fcm_token=str(
                 row[1],
             ),
+            firebase_installation_id=(
+                firebase_installation_id
+            ),
             platform=str(
-                row[2],
+                row[3],
             ),
             enabled=bool(
-                row[3],
+                row[4],
             ),
         )
 

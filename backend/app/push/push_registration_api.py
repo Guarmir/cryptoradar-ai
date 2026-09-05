@@ -30,6 +30,14 @@ class PushDeviceRegistrationRequest(
         max_length=4096,
     )
 
+    firebase_installation_id: Optional[
+        str
+    ] = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+    )
+
     platform: str = Field(
         default="android",
         min_length=1,
@@ -100,6 +108,9 @@ def register_push_device(
                 request.installation_id
             ),
             fcm_token=request.fcm_token,
+            firebase_installation_id=(
+                request.firebase_installation_id
+            ),
             platform=request.platform,
         )
 

@@ -83,8 +83,11 @@ class _FakeCursor:
             scope_key = params[0]
             installation_id = params[1]
             fcm_token = params[2]
-            platform = params[3]
-            enabled = params[4]
+            firebase_installation_id = (
+                params[3]
+            )
+            platform = params[4]
+            enabled = params[5]
 
             self.database.rows[
                 (
@@ -96,6 +99,8 @@ class _FakeCursor:
                     installation_id,
                 "fcm_token":
                     fcm_token,
+                "firebase_installation_id":
+                    firebase_installation_id,
                 "platform":
                     platform,
                 "enabled":
@@ -238,6 +243,9 @@ class _FakeCursor:
         return (
             value["installation_id"],
             value["fcm_token"],
+            value[
+                "firebase_installation_id"
+            ],
             value["platform"],
             value["enabled"],
         )
@@ -309,6 +317,10 @@ class PostgreSQLPushDeviceStoreTest(
             "token-a",
         )
 
+        self.assertIsNone(
+            restored.firebase_installation_id,
+        )
+
         self.assertEqual(
             restored.platform,
             "android",
@@ -316,6 +328,43 @@ class PostgreSQLPushDeviceStoreTest(
 
         self.assertTrue(
             restored.enabled,
+        )
+
+    def test_saves_and_restores_firebase_installation_id(
+        self,
+    ):
+        database = _FakeDatabase()
+
+        store = PostgreSQLPushDeviceStore(
+            database_url="postgresql://test",
+            scope_key="user-a",
+            connection_factory=
+                _FakeConnectionFactory(
+                    database,
+                ),
+        )
+
+        store.save_device(
+            PushDevice(
+                installation_id="device-a",
+                fcm_token="token-a",
+                firebase_installation_id=(
+                    "firebase-device-a"
+                ),
+            )
+        )
+
+        restored = store.load_device(
+            "device-a",
+        )
+
+        self.assertIsNotNone(
+            restored,
+        )
+
+        self.assertEqual(
+            restored.firebase_installation_id,
+            "firebase-device-a",
         )
 
     def test_updates_token_without_duplicate(
@@ -356,6 +405,54 @@ class PostgreSQLPushDeviceStoreTest(
         self.assertEqual(
             devices[0].fcm_token,
             "token-new",
+        )
+
+    def test_updates_fid_without_duplicate(
+        self,
+    ):
+        database = _FakeDatabase()
+
+        store = PostgreSQLPushDeviceStore(
+            database_url="postgresql://test",
+            scope_key="user-a",
+            connection_factory=
+                _FakeConnectionFactory(
+                    database,
+                ),
+        )
+
+        store.save_device(
+            PushDevice(
+                installation_id="device-a",
+                fcm_token="token-a",
+                firebase_installation_id=(
+                    "firebase-old"
+                ),
+            )
+        )
+
+        store.save_device(
+            PushDevice(
+                installation_id="device-a",
+                fcm_token="token-a",
+                firebase_installation_id=(
+                    "firebase-new"
+                ),
+            )
+        )
+
+        devices = store.load_all()
+
+        self.assertEqual(
+            len(devices),
+            1,
+        )
+
+        self.assertEqual(
+            devices[
+                0
+            ].firebase_installation_id,
+            "firebase-new",
         )
 
     def test_scopes_isolate_same_installation(

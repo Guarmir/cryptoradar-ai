@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(
@@ -9,6 +10,9 @@ class PushDevice:
     fcm_token: str
     platform: str = "android"
     enabled: bool = True
+    firebase_installation_id: Optional[
+        str
+    ] = None
 
     def __post_init__(
         self,
@@ -23,6 +27,13 @@ class PushDevice:
 
         normalized_platform = (
             self.platform.strip().lower()
+        )
+
+        normalized_firebase_installation_id = (
+            self.firebase_installation_id.strip()
+            if self.firebase_installation_id
+            is not None
+            else None
         )
 
         if not normalized_installation_id:
@@ -43,6 +54,14 @@ class PushDevice:
                 "não pode ser vazia."
             )
 
+        if (
+            normalized_firebase_installation_id
+            == ""
+        ):
+            normalized_firebase_installation_id = (
+                None
+            )
+
         object.__setattr__(
             self,
             "installation_id",
@@ -61,10 +80,17 @@ class PushDevice:
             normalized_platform,
         )
 
+        object.__setattr__(
+            self,
+            "firebase_installation_id",
+            normalized_firebase_installation_id,
+        )
+
     @property
     def can_receive_push(
         self,
     ) -> bool:
         return self.enabled and bool(
-            self.fcm_token,
+            self.firebase_installation_id
+            or self.fcm_token
         )
