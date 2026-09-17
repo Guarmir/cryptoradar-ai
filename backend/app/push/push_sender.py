@@ -4,6 +4,9 @@ from app.push.push_delivery_models import (
     PushNotificationMessage,
     PushSendResult,
 )
+from app.push.push_device import (
+    PushDevice,
+)
 
 
 class PushSender(ABC):
@@ -11,7 +14,7 @@ class PushSender(ABC):
     def send(
         self,
         *,
-        fcm_token: str,
+        device: PushDevice,
         message: PushNotificationMessage,
     ) -> PushSendResult:
         raise NotImplementedError

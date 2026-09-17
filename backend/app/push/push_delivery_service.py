@@ -50,9 +50,7 @@ class PushDeliveryService:
             try:
                 send_result = (
                     self._push_sender.send(
-                        fcm_token=(
-                            device.fcm_token
-                        ),
+                        device=device,
                         message=message,
                     )
                 )

@@ -2,3 +2,4 @@ fastapi
 uvicorn
 requests
 psycopg[binary]
+firebase-admin==7.5.0

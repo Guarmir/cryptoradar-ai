@@ -84,27 +84,30 @@ class FakePushSender(
     def __init__(
         self,
     ):
-        self.tokens = []
+        self.installation_ids = []
         self.results = {}
         self.exceptions = set()
 
     def send(
         self,
         *,
-        fcm_token,
+        device,
         message,
     ):
-        self.tokens.append(
-            fcm_token
+        self.installation_ids.append(
+            device.installation_id
         )
 
-        if fcm_token in self.exceptions:
+        if (
+            device.installation_id
+            in self.exceptions
+        ):
             raise RuntimeError(
                 "Falha simulada."
             )
 
         return self.results.get(
-            fcm_token,
+            device.installation_id,
             PushSendResult(
                 delivered=True,
             ),
@@ -153,6 +156,49 @@ class PushDeliveryFoundationTest(
                 body="Mensagem",
             )
 
+    def test_service_passes_complete_device_to_sender(
+        self,
+    ):
+        device = PushDevice(
+            installation_id="device-a",
+            fcm_token="token-a",
+            firebase_installation_id=(
+                "firebase-a"
+            ),
+        )
+
+        store = FakePushDeviceStore(
+            devices=(
+                device,
+            )
+        )
+
+        sender = FakePushSender()
+
+        service = PushDeliveryService(
+            device_store=store,
+            push_sender=sender,
+        )
+
+        result = service.deliver(
+            PushNotificationMessage(
+                title="CryptoRadar",
+                body="Teste",
+            )
+        )
+
+        self.assertEqual(
+            sender.installation_ids,
+            [
+                "device-a",
+            ],
+        )
+
+        self.assertEqual(
+            result.delivered,
+            1,
+        )
+
     def test_service_sends_only_enabled_devices(
         self,
     ):
@@ -190,9 +236,9 @@ class PushDeliveryFoundationTest(
         )
 
         self.assertEqual(
-            sender.tokens,
+            sender.installation_ids,
             [
-                "token-a",
+                "device-a",
             ],
         )
 
@@ -229,7 +275,7 @@ class PushDeliveryFoundationTest(
         sender = FakePushSender()
 
         sender.results[
-            "token-b"
+            "device-b"
         ] = PushSendResult(
             delivered=False,
             error_code="temporary_error",
@@ -262,7 +308,7 @@ class PushDeliveryFoundationTest(
             1,
         )
 
-    def test_invalid_token_is_reported_without_token(
+    def test_invalid_destination_does_not_expose_token_or_fid(
         self,
     ):
         store = FakePushDeviceStore(
@@ -274,6 +320,9 @@ class PushDeliveryFoundationTest(
                     fcm_token=(
                         "secret-token"
                     ),
+                    firebase_installation_id=(
+                        "secret-fid"
+                    ),
                 ),
             )
         )
@@ -281,11 +330,11 @@ class PushDeliveryFoundationTest(
         sender = FakePushSender()
 
         sender.results[
-            "secret-token"
+            "device-a"
         ] = PushSendResult(
             delivered=False,
             invalid_token=True,
-            error_code="invalid_token",
+            error_code="invalid_destination",
         )
 
         service = PushDeliveryService(
@@ -318,6 +367,13 @@ class PushDeliveryFoundationTest(
             ),
         )
 
+        self.assertNotIn(
+            "secret-fid",
+            repr(
+                outcome
+            ),
+        )
+
     def test_sender_exception_does_not_stop_batch(
         self,
     ):
@@ -341,7 +397,7 @@ class PushDeliveryFoundationTest(
         sender = FakePushSender()
 
         sender.exceptions.add(
-            "token-a"
+            "device-a"
         )
 
         service = PushDeliveryService(
@@ -372,10 +428,10 @@ class PushDeliveryFoundationTest(
         )
 
         self.assertEqual(
-            sender.tokens,
+            sender.installation_ids,
             [
-                "token-a",
-                "token-b",
+                "device-a",
+                "device-b",
             ],
         )
 
