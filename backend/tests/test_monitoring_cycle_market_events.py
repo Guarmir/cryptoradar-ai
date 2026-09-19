@@ -86,8 +86,11 @@ def test_runner_preserves_empty_events_without_evaluator():
         cycle_result,
     )
 
+    dispatched = []
+
     runner = MonitoringCycleRunner(
         service=service,
+        market_event_callback=dispatched.append,
     )
 
     batch = runner.run_once()
@@ -96,6 +99,7 @@ def test_runner_preserves_empty_events_without_evaluator():
     assert batch.failure_count == 0
     assert batch.market_event_count == 0
     assert not batch.has_market_events
+    assert dispatched == []
 
     execution = batch.executions[0]
 
@@ -104,7 +108,7 @@ def test_runner_preserves_empty_events_without_evaluator():
     assert not execution.has_market_events
 
 
-def test_runner_attaches_detected_market_event():
+def test_runner_attaches_and_dispatches_detected_market_event():
     cycle_result = _build_second_observation_result(
         previous_price=100.0,
         current_price=102.0,
@@ -118,9 +122,12 @@ def test_runner_attaches_detected_market_event():
         minimum_price_change_percent=1.0,
     )
 
+    dispatched = []
+
     runner = MonitoringCycleRunner(
         service=service,
         market_event_evaluator=evaluator,
+        market_event_callback=dispatched.append,
     )
 
     batch = runner.run_once()
@@ -143,6 +150,10 @@ def test_runner_attaches_detected_market_event():
     assert event.previous_price == 100.0
     assert event.current_price == 102.0
 
+    assert dispatched == [
+        event,
+    ]
+
 
 def test_runner_keeps_success_without_event_below_threshold():
     cycle_result = _build_second_observation_result(
@@ -158,9 +169,12 @@ def test_runner_keeps_success_without_event_below_threshold():
         minimum_price_change_percent=1.0,
     )
 
+    dispatched = []
+
     runner = MonitoringCycleRunner(
         service=service,
         market_event_evaluator=evaluator,
+        market_event_callback=dispatched.append,
     )
 
     batch = runner.run_once()
@@ -169,8 +183,44 @@ def test_runner_keeps_success_without_event_below_threshold():
     assert batch.failure_count == 0
     assert batch.market_event_count == 0
     assert not batch.has_market_events
+    assert dispatched == []
+
+
+def test_push_callback_failure_does_not_fail_monitoring_cycle():
+    cycle_result = _build_second_observation_result(
+        previous_price=100.0,
+        current_price=102.0,
+    )
+
+    service = _FakeMonitoringService(
+        cycle_result,
+    )
+
+    evaluator = MarketEventEvaluator(
+        minimum_price_change_percent=1.0,
+    )
+
+    def failing_callback(
+        event,
+    ):
+        raise RuntimeError(
+            "push unavailable"
+        )
+
+    runner = MonitoringCycleRunner(
+        service=service,
+        market_event_evaluator=evaluator,
+        market_event_callback=failing_callback,
+    )
+
+    batch = runner.run_once()
+
+    assert batch.success_count == 1
+    assert batch.failure_count == 0
+    assert batch.market_event_count == 1
+    assert batch.has_market_events
 
     execution = batch.executions[0]
 
     assert execution.succeeded
-    assert execution.market_events == ()
+    assert execution.has_market_events

@@ -1,8 +1,14 @@
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
+from app.monitoring.market_event import (
+    MarketEvent,
+)
 from app.monitoring.market_event_evaluator import (
     MarketEventEvaluator,
+)
+from app.monitoring.monitoring_cycle_result import (
+    MonitoringCycleResult,
 )
 from app.monitoring.monitoring_execution_result import (
     MonitoringBatchResult,
@@ -19,10 +25,16 @@ class MonitoringCycleRunner:
         market_event_evaluator: Optional[
             MarketEventEvaluator
         ] = None,
+        market_event_callback: Optional[
+            Callable[[MarketEvent], object]
+        ] = None,
     ):
         self._service = service
         self._market_event_evaluator = (
             market_event_evaluator
+        )
+        self._market_event_callback = (
+            market_event_callback
         )
 
         self._run_lock = threading.Lock()
@@ -65,6 +77,10 @@ class MonitoringCycleRunner:
                         )
                     )
 
+                    self._dispatch_market_events(
+                        market_events,
+                    )
+
                     executions.append(
                         MonitoringTargetExecution.success(
                             result,
@@ -91,8 +107,8 @@ class MonitoringCycleRunner:
 
     def _evaluate_market_events(
         self,
-        result,
-    ):
+        result: MonitoringCycleResult,
+    ) -> tuple[MarketEvent, ...]:
         evaluator = self._market_event_evaluator
 
         if evaluator is None:
@@ -101,3 +117,22 @@ class MonitoringCycleRunner:
         return evaluator.evaluate(
             result,
         )
+
+    def _dispatch_market_events(
+        self,
+        events: tuple[MarketEvent, ...],
+    ) -> None:
+        callback = self._market_event_callback
+
+        if callback is None:
+            return
+
+        for event in events:
+            try:
+                callback(
+                    event,
+                )
+            except Exception:
+                # Uma falha na entrega de notificacao
+                # nao pode interromper o monitoramento.
+                continue
