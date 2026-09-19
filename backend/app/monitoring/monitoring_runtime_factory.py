@@ -160,6 +160,10 @@ def build_monitoring_runtime(
                     push_config
                     .minimum_price_change_percent
                 ),
+                maximum_observation_gap_seconds=(
+                    push_config
+                    .maximum_observation_gap_seconds
+                ),
             )
         )
 

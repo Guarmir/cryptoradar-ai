@@ -30,6 +30,7 @@ def test_market_event_push_is_disabled_by_default():
     assert not config.enabled
     assert config.minimum_price_change_percent == 1.0
     assert config.cooldown_seconds == 300.0
+    assert config.maximum_observation_gap_seconds == 180.0
 
 
 def test_disabled_configuration_ignores_tuning_values():
@@ -43,6 +44,8 @@ def test_disabled_configuration_ignores_tuning_values():
                     "invalid",
                 "CRYPTORADAR_MARKET_EVENT_PUSH_COOLDOWN_SECONDS":
                     "invalid",
+                "CRYPTORADAR_MARKET_EVENT_MAX_OBSERVATION_GAP_SECONDS":
+                    "invalid",
             }
         )
     )
@@ -50,6 +53,7 @@ def test_disabled_configuration_ignores_tuning_values():
     assert not config.enabled
     assert config.minimum_price_change_percent == 1.0
     assert config.cooldown_seconds == 300.0
+    assert config.maximum_observation_gap_seconds == 180.0
 
 
 def test_parses_enabled_configuration():
@@ -67,6 +71,8 @@ def test_parses_enabled_configuration():
                     "1.5",
                 "CRYPTORADAR_MARKET_EVENT_PUSH_COOLDOWN_SECONDS":
                     "600",
+                "CRYPTORADAR_MARKET_EVENT_MAX_OBSERVATION_GAP_SECONDS":
+                    "180",
             }
         )
     )
@@ -76,6 +82,7 @@ def test_parses_enabled_configuration():
     assert config.scope_key == "push-test"
     assert config.minimum_price_change_percent == 1.5
     assert config.cooldown_seconds == 600.0
+    assert config.maximum_observation_gap_seconds == 180.0
 
 
 def test_enabled_configuration_requires_database_url():
@@ -141,6 +148,25 @@ def test_enabled_configuration_rejects_invalid_cooldown():
                         "push-test",
                     "CRYPTORADAR_MARKET_EVENT_PUSH_COOLDOWN_SECONDS":
                         "-1",
+                }
+            )
+        )
+
+
+def test_enabled_configuration_rejects_invalid_maximum_gap():
+    with pytest.raises(ValueError):
+        (
+            MarketEventPushRuntimeConfig
+            .from_environment(
+                {
+                    "CRYPTORADAR_MARKET_EVENT_PUSH_ENABLED":
+                        "true",
+                    "CRYPTORADAR_DATABASE_URL":
+                        "postgresql://test",
+                    "CRYPTORADAR_PUSH_SCOPE":
+                        "push-test",
+                    "CRYPTORADAR_MARKET_EVENT_MAX_OBSERVATION_GAP_SECONDS":
+                        "0",
                 }
             )
         )
@@ -225,6 +251,11 @@ def test_runtime_factory_wires_enabled_market_push(
         "600",
     )
 
+    monkeypatch.setenv(
+        "CRYPTORADAR_MARKET_EVENT_MAX_OBSERVATION_GAP_SECONDS",
+        "180",
+    )
+
     monitoring_config = (
         MonitoringRuntimeConfig(
             enabled=True,
@@ -271,6 +302,11 @@ def test_runtime_factory_wires_enabled_market_push(
         assert (
             evaluator.minimum_price_change_percent
             == 1.5
+        )
+
+        assert (
+            evaluator.maximum_observation_gap_seconds
+            == 180.0
         )
 
         assert callable(

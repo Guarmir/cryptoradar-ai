@@ -23,6 +23,10 @@ MARKET_EVENT_PUSH_COOLDOWN_ENV = (
     "CRYPTORADAR_MARKET_EVENT_PUSH_COOLDOWN_SECONDS"
 )
 
+MARKET_EVENT_MAX_OBSERVATION_GAP_ENV = (
+    "CRYPTORADAR_MARKET_EVENT_MAX_OBSERVATION_GAP_SECONDS"
+)
+
 
 @dataclass(frozen=True)
 class MarketEventPushRuntimeConfig:
@@ -31,6 +35,7 @@ class MarketEventPushRuntimeConfig:
     scope_key: Optional[str] = None
     minimum_price_change_percent: float = 1.0
     cooldown_seconds: float = 300.0
+    maximum_observation_gap_seconds: float = 180.0
 
     def __post_init__(self):
         if self.minimum_price_change_percent <= 0:
@@ -43,6 +48,12 @@ class MarketEventPushRuntimeConfig:
             raise ValueError(
                 "O cooldown de push deve "
                 "ser maior que zero."
+            )
+
+        if self.maximum_observation_gap_seconds <= 0:
+            raise ValueError(
+                "O intervalo maximo entre observacoes "
+                "deve ser maior que zero."
             )
 
         if not self.enabled:
@@ -124,6 +135,18 @@ class MarketEventPushRuntimeConfig:
             )
         )
 
+        maximum_observation_gap_seconds = (
+            _parse_positive_float(
+                source.get(
+                    MARKET_EVENT_MAX_OBSERVATION_GAP_ENV,
+                ),
+                default=180.0,
+                environment_name=(
+                    MARKET_EVENT_MAX_OBSERVATION_GAP_ENV
+                ),
+            )
+        )
+
         return cls(
             enabled=True,
             database_url=database_url,
@@ -132,6 +155,9 @@ class MarketEventPushRuntimeConfig:
                 minimum_price_change_percent
             ),
             cooldown_seconds=cooldown_seconds,
+            maximum_observation_gap_seconds=(
+                maximum_observation_gap_seconds
+            ),
         )
 
 
