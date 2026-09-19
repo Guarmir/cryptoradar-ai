@@ -1,5 +1,9 @@
 import threading
+from typing import Optional
 
+from app.monitoring.market_event_evaluator import (
+    MarketEventEvaluator,
+)
 from app.monitoring.monitoring_execution_result import (
     MonitoringBatchResult,
     MonitoringTargetExecution,
@@ -12,8 +16,14 @@ class MonitoringCycleRunner:
         self,
         *,
         service: MonitoringService,
+        market_event_evaluator: Optional[
+            MarketEventEvaluator
+        ] = None,
     ):
         self._service = service
+        self._market_event_evaluator = (
+            market_event_evaluator
+        )
 
         self._run_lock = threading.Lock()
 
@@ -49,9 +59,16 @@ class MonitoringCycleRunner:
                         symbol,
                     )
 
+                    market_events = (
+                        self._evaluate_market_events(
+                            result,
+                        )
+                    )
+
                     executions.append(
                         MonitoringTargetExecution.success(
                             result,
+                            market_events=market_events,
                         )
                     )
 
@@ -71,3 +88,16 @@ class MonitoringCycleRunner:
 
         finally:
             self._run_lock.release()
+
+    def _evaluate_market_events(
+        self,
+        result,
+    ):
+        evaluator = self._market_event_evaluator
+
+        if evaluator is None:
+            return ()
+
+        return evaluator.evaluate(
+            result,
+        )
