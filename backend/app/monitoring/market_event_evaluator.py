@@ -13,7 +13,7 @@ class MarketEventEvaluator:
         minimum_price_change_percent: float,
         maximum_observation_gap_seconds: Optional[
             float
-        ] = None,
+        ] = 180.0,
     ):
         if minimum_price_change_percent <= 0:
             raise ValueError(
@@ -54,13 +54,51 @@ class MarketEventEvaluator:
         if result.is_first_observation:
             return ()
 
-        if self._has_stale_previous_observation(
-            result,
+        previous_observation = (
+            result.previous_state.current_observation
+        )
+
+        current_observation = result.observation
+
+        if previous_observation is None:
+            return ()
+
+        previous_observed_at = (
+            previous_observation.observed_at
+        )
+
+        current_observed_at = (
+            current_observation.observed_at
+        )
+
+        if (
+            previous_observed_at is None
+            or current_observed_at is None
+        ):
+            return ()
+
+        observation_gap_seconds = (
+            current_observed_at
+            - previous_observed_at
+        ).total_seconds()
+
+        if observation_gap_seconds <= 0:
+            return ()
+
+        maximum_gap = (
+            self._maximum_observation_gap_seconds
+        )
+
+        if (
+            maximum_gap is not None
+            and observation_gap_seconds > maximum_gap
         ):
             return ()
 
         previous_price = result.previous_price
-        price_change_percent = result.price_change_percent
+        price_change_percent = (
+            result.price_change_percent
+        )
 
         if (
             previous_price is None
@@ -74,13 +112,6 @@ class MarketEventEvaluator:
         ):
             return ()
 
-        observed_at = result.observation.observed_at
-
-        if observed_at is None:
-            raise ValueError(
-                "A observacao precisa possuir horario."
-            )
-
         if price_change_percent > 0:
             event_type = "price_move_up"
         else:
@@ -93,51 +124,6 @@ class MarketEventEvaluator:
                 previous_price=previous_price,
                 current_price=result.current_price,
                 price_change_percent=price_change_percent,
-                observed_at=observed_at,
+                observed_at=current_observed_at,
             ),
         )
-
-    def _has_stale_previous_observation(
-        self,
-        result: MonitoringCycleResult,
-    ) -> bool:
-        maximum_gap = (
-            self._maximum_observation_gap_seconds
-        )
-
-        if maximum_gap is None:
-            return False
-
-        previous_observation = (
-            result.previous_state.current_observation
-        )
-
-        current_observation = (
-            result.observation
-        )
-
-        if previous_observation is None:
-            return False
-
-        previous_at = (
-            previous_observation.observed_at
-        )
-
-        current_at = (
-            current_observation.observed_at
-        )
-
-        if (
-            previous_at is None
-            or current_at is None
-        ):
-            return True
-
-        gap_seconds = (
-            current_at - previous_at
-        ).total_seconds()
-
-        if gap_seconds <= 0:
-            return True
-
-        return gap_seconds > maximum_gap

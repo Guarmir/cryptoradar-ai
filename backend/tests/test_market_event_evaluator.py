@@ -286,3 +286,60 @@ def test_recent_previous_observation_can_generate_event():
 
     assert len(events) == 1
     assert events[0].event_type == "price_move_up"
+
+
+def test_stale_previous_observation_does_not_generate_event():
+    engine = _create_engine()
+
+    _observe(
+        engine,
+        price=100.0,
+        minute=0,
+    )
+
+    result = _observe(
+        engine,
+        price=110.0,
+        minute=10,
+    )
+
+    evaluator = MarketEventEvaluator(
+        minimum_price_change_percent=1.0,
+        maximum_observation_gap_seconds=180,
+    )
+
+    assert evaluator.evaluate(result) == ()
+
+
+def test_recent_observations_still_generate_event():
+    engine = _create_engine()
+
+    _observe(
+        engine,
+        price=100.0,
+        minute=0,
+    )
+
+    result = _observe(
+        engine,
+        price=102.0,
+        minute=2,
+    )
+
+    evaluator = MarketEventEvaluator(
+        minimum_price_change_percent=1.0,
+        maximum_observation_gap_seconds=180,
+    )
+
+    events = evaluator.evaluate(result)
+
+    assert len(events) == 1
+    assert events[0].event_type == "price_move_up"
+
+
+def test_rejects_non_positive_maximum_observation_gap():
+    with pytest.raises(ValueError):
+        MarketEventEvaluator(
+            minimum_price_change_percent=1.0,
+            maximum_observation_gap_seconds=0,
+        )

@@ -50,7 +50,7 @@ def test_builds_upward_market_event_push_message():
 
     assert (
         message.body
-        == "O preco variou 2.00% desde a ultima observacao."
+        == "O preço variou 2.00% desde a última observação."
     )
 
     assert message.data["type"] == "market_event"
@@ -82,7 +82,7 @@ def test_builds_downward_market_event_push_message():
 
     assert (
         message.body
-        == "O preco variou 2.50% desde a ultima observacao."
+        == "O preço variou 2.50% desde a última observação."
     )
 
     assert message.data["event_type"] == "price_move_down"

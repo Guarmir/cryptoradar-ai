@@ -24,8 +24,8 @@ class MarketEventPushMessageBuilder:
         )
 
         body = (
-            f"O preco variou {change:.2f}% "
-            "desde a ultima observacao."
+            f"O preço variou {change:.2f}% "
+             "desde a última observação."
         )
 
         return PushNotificationMessage(
