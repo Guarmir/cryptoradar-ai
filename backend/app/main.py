@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import threading
 import time
-
+from app.access.access_api import (
+    AccessEntitlementsResponse,
+    get_access_entitlements,
+)
 from app.monitoring.monitoring_fastapi_lifecycle import (
     monitoring_lifespan,
 )
@@ -490,7 +493,18 @@ def build_empty_asset_response(original_input: str, days: int = 1):
         "days": days,
         "points": []
     }
-
+@app.get(
+    "/access/entitlements/{installation_id}",
+    response_model=(
+        AccessEntitlementsResponse
+    ),
+)
+def get_access_entitlements_endpoint(
+    installation_id: str,
+):
+    return get_access_entitlements(
+        installation_id,
+    )
 @app.post(
     "/push/devices/register",
     response_model=(
