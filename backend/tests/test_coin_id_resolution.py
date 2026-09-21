@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch
 
-from app.main import resolve_coin_id
+from app.services.market_data_service import (
+    resolve_coin_id,
+)
 
 
 class CoinIdResolutionTest(
@@ -11,7 +13,7 @@ class CoinIdResolutionTest(
         self,
     ):
         with patch(
-            "app.main.get_coin_list"
+            "app.services.market_data_service.get_coin_list"
         ) as get_coin_list:
             result = resolve_coin_id(
                 "BTC"
@@ -28,7 +30,7 @@ class CoinIdResolutionTest(
         self,
     ):
         with patch(
-            "app.main.get_coin_list"
+            "app.services.market_data_service.get_coin_list"
         ) as get_coin_list:
             result = resolve_coin_id(
                 "eth"
@@ -45,7 +47,7 @@ class CoinIdResolutionTest(
         self,
     ):
         with patch(
-            "app.main.get_coin_list"
+            "app.services.market_data_service.get_coin_list"
         ) as get_coin_list:
             result = resolve_coin_id(
                 " SOL "
@@ -70,7 +72,7 @@ class CoinIdResolutionTest(
         ]
 
         with patch(
-            "app.main.get_coin_list",
+            "app.services.market_data_service.get_coin_list",
             return_value=coins,
         ):
             result = resolve_coin_id(
@@ -94,7 +96,7 @@ class CoinIdResolutionTest(
         ]
 
         with patch(
-            "app.main.get_coin_list",
+            "app.services.market_data_service.get_coin_list",
             return_value=coins,
         ):
             result = resolve_coin_id(
