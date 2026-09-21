@@ -7,6 +7,13 @@ from app.ai.market_overview_snapshot import (
     MarketOverviewSnapshot,
 )
 
+from app.ai.market_domain import (
+    MarketDomain,
+)
+from app.ai.market_overview_provider import (
+    MarketOverviewProvider,
+)
+
 
 class MarketOverviewDataError(
     RuntimeError
@@ -14,7 +21,9 @@ class MarketOverviewDataError(
     pass
 
 
-class CoinGeckoMarketOverviewProvider:
+class CoinGeckoMarketOverviewProvider(
+    MarketOverviewProvider
+):
     GLOBAL_URL = (
         "https://api.coingecko.com/api/v3/global"
     )
@@ -53,6 +62,12 @@ class CoinGeckoMarketOverviewProvider:
             request_get
             or requests.get
         )
+
+    @property
+    def domain(
+        self,
+    ) -> MarketDomain:
+        return MarketDomain.CRYPTO
 
     def fetch(
         self,
