@@ -186,8 +186,18 @@ def test_invalid_mover_limit_is_rejected():
         )
 
 
-def test_context_service_uses_provider():
+def test_context_service_uses_generic_provider():
     class FakeProvider:
+        @property
+        def domain(
+            self,
+        ):
+            from app.ai.market_domain import (
+                MarketDomain,
+            )
+
+            return MarketDomain.STOCKS
+
         def fetch(
             self,
         ):
@@ -204,8 +214,14 @@ def test_context_service_uses_provider():
     )
 
     assert context.is_supported
+
     assert (
         context.intent
         == AssistantIntent
         .MARKET_OVERVIEW
+    )
+
+    assert (
+        service.domain.value
+        == "stocks"
     )

@@ -6,8 +6,14 @@ from app.ai.assistant_context import (
 from app.ai.coingecko_market_overview_provider import (
     CoinGeckoMarketOverviewProvider,
 )
+from app.ai.market_domain import (
+    MarketDomain,
+)
 from app.ai.market_overview_context_builder import (
     build_market_overview_context,
+)
+from app.ai.market_overview_provider import (
+    MarketOverviewProvider,
 )
 
 
@@ -16,7 +22,7 @@ class MarketOverviewContextService:
         self,
         *,
         provider: Optional[
-            CoinGeckoMarketOverviewProvider
+            MarketOverviewProvider
         ] = None,
     ):
         self._provider = (
@@ -24,6 +30,12 @@ class MarketOverviewContextService:
             if provider is not None
             else CoinGeckoMarketOverviewProvider()
         )
+
+    @property
+    def domain(
+        self,
+    ) -> MarketDomain:
+        return self._provider.domain
 
     def build_context(
         self,
