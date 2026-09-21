@@ -7,11 +7,6 @@ from app.ai.radar_ai_router import (
 from app.monitoring.monitoring_fastapi_lifecycle import (
     monitoring_lifespan,
 )
-from app.push.push_registration_api import (
-    PushDeviceRegistrationRequest,
-    PushDeviceRegistrationResponse,
-    register_push_device,
-)
 from app.services.routes.access_router import (
     create_access_router,
 )
@@ -20,6 +15,9 @@ from app.services.routes.alert_router import (
 )
 from app.services.routes.asset_router import (
     create_asset_router,
+)
+from app.services.routes.push_router import (
+    create_push_router,
 )
 
 
@@ -53,19 +51,9 @@ app.include_router(
     create_access_router()
 )
 
-
-@app.post(
-    "/push/devices/register",
-    response_model=(
-        PushDeviceRegistrationResponse
-    ),
+app.include_router(
+    create_push_router()
 )
-def register_push_device_endpoint(
-    request: PushDeviceRegistrationRequest,
-):
-    return register_push_device(
-        request,
-    )
 
 
 @app.get("/")
