@@ -1,18 +1,13 @@
-import app.main as main
 from app.services import (
     market_data_service,
 )
 from app.services.routes import (
+    alert_router,
     asset_router,
 )
 
 
 def test_routes_use_extracted_market_data_service() -> None:
-    assert (
-        main.resolve_coin_id
-        is market_data_service.resolve_coin_id
-    )
-
     assert (
         asset_router.resolve_coin_id
         is market_data_service.resolve_coin_id
@@ -31,4 +26,9 @@ def test_routes_use_extracted_market_data_service() -> None:
     assert (
         asset_router.safe_float
         is market_data_service.safe_float
+    )
+
+    assert (
+        alert_router.resolve_coin_id
+        is market_data_service.resolve_coin_id
     )

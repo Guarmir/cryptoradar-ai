@@ -1,5 +1,3 @@
-import threading
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,11 +16,8 @@ from app.push.push_registration_api import (
     PushDeviceRegistrationResponse,
     register_push_device,
 )
-from app.services.market_data_service import (
-    resolve_coin_id,
-)
-from app.services.price_alert import (
-    monitor_price,
+from app.services.routes.alert_router import (
+    create_alert_router,
 )
 from app.services.routes.asset_router import (
     create_asset_router,
@@ -49,6 +44,10 @@ app.include_router(
 
 app.include_router(
     create_asset_router()
+)
+
+app.include_router(
+    create_alert_router()
 )
 
 
@@ -85,41 +84,4 @@ def home():
     return {
         "status": "CryptoRadar AI online",
         "version": "2.1.0",
-    }
-
-
-@app.get(
-    "/alert/{coin}/{price}"
-)
-def start_alert(
-    coin: str,
-    price: float,
-):
-    coin_id = resolve_coin_id(
-        coin
-    )
-
-    if not coin_id:
-        return {
-            "error": (
-                "Moeda não encontrada"
-            )
-        }
-
-    thread = threading.Thread(
-        target=monitor_price,
-        args=(
-            coin_id,
-            price,
-        ),
-        daemon=True,
-    )
-
-    thread.start()
-
-    return {
-        "status": "Alerta iniciado",
-        "coin": coin.upper(),
-        "coin_id": coin_id,
-        "target_price": price,
     }
