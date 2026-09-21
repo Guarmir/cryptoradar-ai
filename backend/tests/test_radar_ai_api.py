@@ -1,0 +1,142 @@
+import pytest
+from fastapi import HTTPException
+
+from app.ai.assistant_context import (
+    AssistantContext,
+    AssistantContextItem,
+)
+from app.ai.assistant_intent import (
+    AssistantIntent,
+)
+from app.ai.coingecko_market_overview_provider import (
+    MarketOverviewDataError,
+)
+from app.ai.radar_ai_api import (
+    RadarAIQuestionRequest,
+    ask_radar_ai,
+)
+from app.ai.radar_ai_orchestrator import (
+    RadarAIOrchestrationResult,
+)
+
+
+def _context() -> AssistantContext:
+    return AssistantContext(
+        intent=(
+            AssistantIntent.MARKET_OVERVIEW
+        ),
+        source="coingecko",
+        source_version=None,
+        items=(
+            AssistantContextItem(
+                key="market_summary",
+                title="Resumo do mercado",
+                content=(
+                    "Mercado cripto disponível."
+                ),
+            ),
+        ),
+    )
+
+
+def test_api_returns_orchestrated_context() -> None:
+    provider = object()
+
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            return (
+                RadarAIOrchestrationResult(
+                    question=question,
+                    intent="market_overview",
+                    market="crypto",
+                    provider=provider,
+                    context=_context(),
+                )
+            )
+
+    response = ask_radar_ai(
+        RadarAIQuestionRequest(
+            question=(
+                "Como está o mercado cripto?"
+            ),
+        ),
+        orchestrator=FakeOrchestrator(),
+    )
+
+    assert response.question == (
+        "Como está o mercado cripto?"
+    )
+    assert response.intent == (
+        "market_overview"
+    )
+    assert response.market == "crypto"
+    assert response.supported is True
+    assert response.source == "coingecko"
+    assert response.source_version is None
+
+    assert len(response.items) == 1
+
+    assert response.items[0].key == (
+        "market_summary"
+    )
+
+
+def test_api_maps_invalid_request_to_422() -> None:
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            raise ValueError(
+                "unsupported Radar AI route"
+            )
+
+    with pytest.raises(
+        HTTPException,
+    ) as captured:
+        ask_radar_ai(
+            RadarAIQuestionRequest(
+                question="Analise BTC",
+            ),
+            orchestrator=(
+                FakeOrchestrator()
+            ),
+        )
+
+    assert (
+        captured.value.status_code
+        == 422
+    )
+
+
+def test_api_maps_market_error_to_503() -> None:
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            raise MarketOverviewDataError(
+                "Dados indisponíveis."
+            )
+
+    with pytest.raises(
+        HTTPException,
+    ) as captured:
+        ask_radar_ai(
+            RadarAIQuestionRequest(
+                question=(
+                    "Como está o mercado?"
+                ),
+            ),
+            orchestrator=(
+                FakeOrchestrator()
+            ),
+        )
+
+    assert (
+        captured.value.status_code
+        == 503
+    )
