@@ -77,6 +77,10 @@ def test_api_returns_orchestrated_context() -> None:
     assert response.source == "coingecko"
     assert response.source_version is None
 
+    assert response.answer == (
+        "Mercado cripto disponível."
+    )
+
     assert len(response.items) == 1
 
     assert response.items[0].key == (

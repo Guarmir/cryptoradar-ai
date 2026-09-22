@@ -7,6 +7,9 @@ from app.ai.coingecko_market_overview_provider import (
     CoinGeckoMarketOverviewProvider,
     MarketOverviewDataError,
 )
+from app.ai.radar_ai_answer_composer import (
+    RadarAIAnswerComposer,
+)
 from app.ai.radar_ai_crypto_v1_application_factory import (
     RadarAICryptoV1ApplicationFactory,
 )
@@ -41,6 +44,7 @@ class RadarAIQuestionResponse(
     supported: bool
     source: str
     source_version: Optional[str]
+    answer: str
     items: list[
         RadarAIContextItemResponse
     ]
@@ -51,6 +55,9 @@ def ask_radar_ai(
     *,
     orchestrator: Optional[
         RadarAIOrchestrator
+    ] = None,
+    answer_composer: Optional[
+        RadarAIAnswerComposer
     ] = None,
 ) -> RadarAIQuestionResponse:
     effective_orchestrator = orchestrator
@@ -68,6 +75,11 @@ def ask_radar_ai(
                 ),
             )
         )
+
+    effective_answer_composer = (
+        answer_composer
+        or RadarAIAnswerComposer()
+    )
 
     try:
         result = (
@@ -91,6 +103,12 @@ def ask_radar_ai(
 
     context = result.context
 
+    answer = (
+        effective_answer_composer.compose(
+            context
+        )
+    )
+
     return RadarAIQuestionResponse(
         question=result.question,
         intent=result.intent,
@@ -100,6 +118,7 @@ def ask_radar_ai(
         source_version=(
             context.source_version
         ),
+        answer=answer,
         items=[
             RadarAIContextItemResponse(
                 key=item.key,
