@@ -9,6 +9,7 @@ class AssistantIntent(
     PRODUCT_HELP = "product_help"
     MARKET_OVERVIEW = "market_overview"
     ASSET_ANALYSIS = "asset_analysis"
+    ASSET_COMPARISON = "asset_comparison"
     UNKNOWN = "unknown"
 
 

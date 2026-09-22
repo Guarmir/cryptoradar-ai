@@ -348,3 +348,87 @@ def test_main_app_returns_explanatory_asset_answer(
         items["asset_price"]
         not in answer
     )
+
+def test_main_app_returns_asset_comparison_answer(
+    monkeypatch,
+) -> None:
+    class FakeMarketOverviewProvider:
+        pass
+
+    markets = {
+        "uniswap": {
+            "id": "uniswap",
+            "symbol": "uni",
+            "name": "Uniswap",
+            "current_price": 12.50,
+            "market_cap": 7_500_000_000,
+            "total_volume": 650_000_000,
+            "price_change_percentage_24h": 4.2,
+        },
+        "solana": {
+            "id": "solana",
+            "symbol": "sol",
+            "name": "Solana",
+            "current_price": 180.0,
+            "market_cap": 85_000_000_000,
+            "total_volume": 4_500_000_000,
+            "price_change_percentage_24h": 2.1,
+        },
+    }
+
+    class FakeAssetProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            return markets[asset_id]
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CoinGeckoMarketOverviewProvider",
+        FakeMarketOverviewProvider,
+    )
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CryptoAssetAnalysisProvider",
+        FakeAssetProvider,
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ai/radar/ask",
+        json={
+            "question": (
+                "Qual está com melhor "
+                "score, UNI ou SOL?"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["intent"] == (
+        "asset_comparison"
+    )
+
+    assert body["market"] == "crypto"
+
+    assert body["source"] == (
+        "cryptoradar_asset_comparison"
+    )
+
+    assert body["source_version"] == "v1"
+
+    answer = body["answer"]
+
+    assert "Uniswap (UNI)" in answer
+    assert "Solana (SOL)" in answer
+
+    assert "/100" in answer
+
+    assert "12.50000000" not in answer
+    assert "180.00000000" not in answer

@@ -3,6 +3,12 @@ from typing import Any, Optional
 from app.ai.crypto_asset_analysis_provider import (
     CryptoAssetAnalysisProvider,
 )
+from app.ai.radar_ai_asset_comparison_context_service import (
+    RadarAIAssetComparisonContextService,
+)
+from app.ai.radar_ai_asset_comparison_resolver import (
+    RadarAIAssetComparisonResolver,
+)
 from app.ai.radar_ai_asset_context_service import (
     RadarAIAssetContextService,
 )
@@ -40,16 +46,27 @@ class RadarAICryptoV1ApplicationFactory:
         asset_resolver: Optional[
             RadarAIAssetResolver
         ] = None,
+        asset_comparison_resolver: Optional[
+            RadarAIAssetComparisonResolver
+        ] = None,
     ) -> RadarAIOrchestrator:
         effective_asset_resolver = (
             asset_resolver
             or RadarAIAssetResolver()
         )
 
+        effective_comparison_resolver = (
+            asset_comparison_resolver
+            or RadarAIAssetComparisonResolver()
+        )
+
         intent_resolver = (
             RadarAIIntentResolver(
                 asset_resolver=(
                     effective_asset_resolver
+                ),
+                asset_comparison_resolver=(
+                    effective_comparison_resolver
                 ),
             )
         )
@@ -95,6 +112,23 @@ class RadarAICryptoV1ApplicationFactory:
                 question
             )
 
+        def build_asset_comparison_context(
+            question: str,
+            provider: Any,
+        ):
+            service = (
+                RadarAIAssetComparisonContextService(
+                    provider=provider,
+                    comparison_resolver=(
+                        effective_comparison_resolver
+                    ),
+                )
+            )
+
+            return service.build_context(
+                question
+            )
+
         context_builder = (
             RadarAICryptoContextBuilder(
                 build_market_overview_context=(
@@ -102,6 +136,9 @@ class RadarAICryptoV1ApplicationFactory:
                 ),
                 build_asset_analysis_context=(
                     build_asset_analysis_context
+                ),
+                build_asset_comparison_context=(
+                    build_asset_comparison_context
                 ),
             )
         )

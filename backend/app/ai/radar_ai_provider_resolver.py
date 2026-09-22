@@ -4,6 +4,8 @@ from typing import Any, Optional
 class RadarAIProviderResolver:
     MARKET_OVERVIEW = "market_overview"
     ASSET_ANALYSIS = "asset_analysis"
+    ASSET_COMPARISON = "asset_comparison"
+
     CRYPTO = "crypto"
 
     def __init__(
@@ -36,7 +38,11 @@ class RadarAIProviderResolver:
             )
 
         if (
-            intent == self.ASSET_ANALYSIS
+            intent
+            in (
+                self.ASSET_ANALYSIS,
+                self.ASSET_COMPARISON,
+            )
             and market == self.CRYPTO
             and (
                 self._crypto_asset_analysis_provider
