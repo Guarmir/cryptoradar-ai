@@ -17,6 +17,8 @@ class RadarAIAssetResolver:
             "analisar",
             "ativo",
             "ativos",
+            "bearish",
+            "bullish",
             "cenario",
             "como",
             "com",
@@ -56,6 +58,7 @@ class RadarAIAssetResolver:
             "sinal",
             "situacao",
             "sobre",
+            "tendencia",
             "um",
             "uma",
             "valor",
@@ -80,6 +83,9 @@ class RadarAIAssetResolver:
         "variacao",
         "variou",
         "volume",
+        "bullish",
+        "bearish",
+        "tendencia",
         "o que esta acontecendo com",
     )
 

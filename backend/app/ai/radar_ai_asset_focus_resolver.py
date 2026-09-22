@@ -10,11 +10,27 @@ class RadarAIAssetFocusResolver:
     CHANGE = "change"
     VOLUME = "volume"
     INVALIDATION = "invalidation"
+    EXPLANATION = "explanation"
+
+    _EXPLANATION_TERMS = (
+        "por que",
+        "porque",
+        "motivo",
+        "motivos",
+        "razao",
+        "razoes",
+        "explique",
+        "explica",
+        "explicar",
+        "sustenta",
+        "sustentando",
+        "justifica",
+        "justificando",
+    )
 
     _SCORE_TERMS = (
         "score",
         "pontuacao",
-        "pontuação",
         "nota",
     )
 
@@ -23,6 +39,7 @@ class RadarAIAssetFocusResolver:
         "signal",
         "bullish",
         "bearish",
+        "tendencia",
     )
 
     _RISK_TERMS = (
@@ -34,19 +51,15 @@ class RadarAIAssetFocusResolver:
 
     _PRICE_TERMS = (
         "preco",
-        "preço",
         "price",
         "cotacao",
-        "cotação",
         "valor",
     )
 
     _CHANGE_TERMS = (
         "variacao",
-        "variação",
         "variou",
         "mudanca",
-        "mudança",
         "change",
         "24h",
     )
@@ -58,7 +71,6 @@ class RadarAIAssetFocusResolver:
 
     _INVALIDATION_TERMS = (
         "invalidacao",
-        "invalidação",
         "invalida",
         "invalidar",
     )
@@ -75,6 +87,19 @@ class RadarAIAssetFocusResolver:
             raise ValueError(
                 "question must not be empty"
             )
+
+        # Explicação precisa ser detectada
+        # antes de score/sinal.
+        #
+        # Exemplo:
+        # "Por que a UNI está com esse sinal?"
+        # deve virar explanation,
+        # e não apenas signal.
+        if self._contains_any(
+            normalized,
+            self._EXPLANATION_TERMS,
+        ):
+            return self.EXPLANATION
 
         if self._contains_any(
             normalized,

@@ -263,3 +263,88 @@ def test_main_app_returns_focused_asset_answers(
         assert unexpected_fragment not in (
             body["answer"]
         )
+def test_main_app_returns_explanatory_asset_answer(
+    monkeypatch,
+) -> None:
+    class FakeMarketOverviewProvider:
+        pass
+
+    class FakeAssetProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            assert asset_id == "uniswap"
+
+            return {
+                "id": "uniswap",
+                "symbol": "uni",
+                "name": "Uniswap",
+                "current_price": 12.50,
+                "market_cap": 7_500_000_000,
+                "total_volume": 650_000_000,
+                "price_change_percentage_24h": 4.2,
+            }
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CoinGeckoMarketOverviewProvider",
+        FakeMarketOverviewProvider,
+    )
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CryptoAssetAnalysisProvider",
+        FakeAssetProvider,
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ai/radar/ask",
+        json={
+            "question": (
+                "Por que a UNI está "
+                "com esse sinal?"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["intent"] == (
+        "asset_analysis"
+    )
+
+    assert body["market"] == "crypto"
+
+    assert body["source"] == (
+        "cryptoradar_asset_analysis"
+    )
+
+    items = {
+        item["key"]: item["content"]
+        for item in body["items"]
+    }
+
+    answer = body["answer"]
+
+    expected_keys = (
+        "asset_score",
+        "asset_signal",
+        "asset_reasons",
+        "asset_risks",
+        "asset_invalidation",
+    )
+
+    for key in expected_keys:
+        assert key in items
+        assert items[key].strip()
+        assert items[key] in answer
+
+    assert (
+        items["asset_price"]
+        not in answer
+    )

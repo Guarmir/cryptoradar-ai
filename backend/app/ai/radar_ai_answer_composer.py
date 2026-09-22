@@ -126,6 +126,16 @@ class RadarAIAnswerComposer:
             ): (
                 "asset_invalidation",
             ),
+            (
+                RadarAIAssetFocusResolver
+                .EXPLANATION
+            ): (
+                "asset_score",
+                "asset_signal",
+                "asset_reasons",
+                "asset_risks",
+                "asset_invalidation",
+            ),
         }
 
         selected_keys = (
