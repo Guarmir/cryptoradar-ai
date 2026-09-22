@@ -169,3 +169,97 @@ def test_main_app_runs_asset_analysis_endpoint(
     assert "Uniswap" in body["answer"]
 
     assert body["items"]
+
+def test_main_app_returns_focused_asset_answers(
+    monkeypatch,
+) -> None:
+    class FakeMarketOverviewProvider:
+        pass
+
+    class FakeAssetProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            assert asset_id == "uniswap"
+
+            return {
+                "id": "uniswap",
+                "symbol": "uni",
+                "name": "Uniswap",
+                "current_price": 12.50,
+                "market_cap": 7_500_000_000,
+                "total_volume": 650_000_000,
+                "price_change_percentage_24h": 4.2,
+            }
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CoinGeckoMarketOverviewProvider",
+        FakeMarketOverviewProvider,
+    )
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CryptoAssetAnalysisProvider",
+        FakeAssetProvider,
+    )
+
+    client = TestClient(app)
+
+    cases = (
+        (
+            "Qual o preço da UNI?",
+            "12.50000000",
+            "/100",
+        ),
+        (
+            "Qual o score da UNI?",
+            "65/100",
+            "12.50000000",
+        ),
+        (
+            "Quanto a UNI variou hoje?",
+            "+4.20%",
+            "65/100",
+        ),
+        (
+            "Quais os riscos da UNI?",
+            "Falta de confirmação",
+            "12.50000000",
+        ),
+    )
+
+    for (
+        question,
+        expected_fragment,
+        unexpected_fragment,
+    ) in cases:
+        response = client.post(
+            "/ai/radar/ask",
+            json={
+                "question": question,
+            },
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["intent"] == (
+            "asset_analysis"
+        )
+
+        assert body["market"] == "crypto"
+
+        assert body["source"] == (
+            "cryptoradar_asset_analysis"
+        )
+
+        assert expected_fragment in (
+            body["answer"]
+        )
+
+        assert unexpected_fragment not in (
+            body["answer"]
+        )

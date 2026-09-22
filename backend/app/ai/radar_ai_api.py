@@ -119,7 +119,8 @@ def ask_radar_ai(
 
     answer = (
         effective_answer_composer.compose(
-            context
+            context,
+            result.question,
         )
     )
 

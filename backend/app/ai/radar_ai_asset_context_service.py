@@ -141,19 +141,56 @@ class RadarAIAssetContextService:
                 ),
             ),
             AssistantContextItem(
-                key="asset_market_data",
-                title="Dados de mercado",
+                key="asset_price",
+                title="Preço",
                 content=(
-                    f"Preço: US$ {price:,.8f}. "
-                    f"Variação em 24h: "
-                    f"{change_24h:+.2f}%. "
-                    f"Volume em 24h: "
-                    f"US$ {volume:,.0f}. "
-                    f"Capitalização: "
-                    f"US$ {market_cap:,.0f}. "
-                    f"Score: {score}/100. "
-                    f"Sinal: {signal}. "
-                    f"Confiança: "
+                    f"{name} ({symbol}) está "
+                    f"cotado em US$ {price:,.8f}."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_change",
+                title="Variação em 24h",
+                content=(
+                    f"A variação de {name} "
+                    f"nas últimas 24 horas é "
+                    f"{change_24h:+.2f}%."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_volume",
+                title="Volume em 24h",
+                content=(
+                    f"O volume negociado de "
+                    f"{name} em 24 horas é "
+                    f"US$ {volume:,.0f}."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_market_cap",
+                title="Capitalização",
+                content=(
+                    f"A capitalização de "
+                    f"{name} é "
+                    f"US$ {market_cap:,.0f}."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_score",
+                title="Score",
+                content=(
+                    f"O score atual de "
+                    f"{name} é "
+                    f"{score}/100."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_signal",
+                title="Sinal",
+                content=(
+                    f"O sinal atual de "
+                    f"{name} é {signal}, "
+                    f"com confiança de "
                     f"{confidence:.0%}."
                 ),
             ),

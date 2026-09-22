@@ -125,11 +125,58 @@ def test_asset_context_is_built_from_question() -> None:
 
     assert keys == [
         "asset_summary",
-        "asset_market_data",
+        "asset_price",
+        "asset_change",
+        "asset_volume",
+        "asset_market_cap",
+        "asset_score",
+        "asset_signal",
         "asset_reasons",
         "asset_risks",
         "asset_invalidation",
     ]
+
+
+def test_asset_context_contains_specific_data_items() -> None:
+    class FakeProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            return _market()
+
+    service = RadarAIAssetContextService(
+        provider=FakeProvider(),
+    )
+
+    context = service.build_context(
+        "Como está a UNI?"
+    )
+
+    items = {
+        item.key: item.content
+        for item in context.items
+    }
+
+    assert "12.50000000" in (
+        items["asset_price"]
+    )
+
+    assert "+4.20%" in (
+        items["asset_change"]
+    )
+
+    assert "650,000,000" in (
+        items["asset_volume"]
+    )
+
+    assert "/100" in (
+        items["asset_score"]
+    )
+
+    assert (
+        items["asset_signal"]
+    )
 
 
 def test_asset_context_rejects_question_without_asset() -> None:

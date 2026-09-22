@@ -245,3 +245,65 @@ def test_api_maps_asset_error_to_503() -> None:
         captured.value.status_code
         == 503
     )
+def test_api_returns_focused_asset_answer() -> None:
+    provider = object()
+
+    context = AssistantContext(
+        intent=(
+            AssistantIntent.ASSET_ANALYSIS
+        ),
+        source=(
+            "cryptoradar_asset_analysis"
+        ),
+        source_version="v1",
+        items=(
+            AssistantContextItem(
+                key="asset_price",
+                title="Preço",
+                content=(
+                    "Uniswap está cotado "
+                    "em US$ 12.50."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_score",
+                title="Score",
+                content=(
+                    "O score atual de "
+                    "Uniswap é 77/100."
+                ),
+            ),
+        ),
+    )
+
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            return (
+                RadarAIOrchestrationResult(
+                    question=question,
+                    intent="asset_analysis",
+                    market="crypto",
+                    provider=provider,
+                    context=context,
+                )
+            )
+
+    response = ask_radar_ai(
+        RadarAIQuestionRequest(
+            question=(
+                "Qual o score da UNI?"
+            ),
+        ),
+        orchestrator=(
+            FakeOrchestrator()
+        ),
+    )
+
+    assert "77/100" in response.answer
+
+    assert "US$ 12.50" not in (
+        response.answer
+    )
