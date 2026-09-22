@@ -6,6 +6,9 @@ from app.ai.crypto_asset_analysis_provider import (
 from app.ai.radar_ai_asset_context_service import (
     RadarAIAssetContextService,
 )
+from app.ai.radar_ai_asset_resolver import (
+    RadarAIAssetResolver,
+)
 from app.ai.radar_ai_crypto_context_builder import (
     RadarAICryptoContextBuilder,
 )
@@ -34,10 +37,26 @@ class RadarAICryptoV1ApplicationFactory:
         crypto_asset_analysis_provider: Optional[
             Any
         ] = None,
+        asset_resolver: Optional[
+            RadarAIAssetResolver
+        ] = None,
     ) -> RadarAIOrchestrator:
-        intent_resolver = RadarAIIntentResolver()
+        effective_asset_resolver = (
+            asset_resolver
+            or RadarAIAssetResolver()
+        )
 
-        market_resolver = RadarAIMarketResolver()
+        intent_resolver = (
+            RadarAIIntentResolver(
+                asset_resolver=(
+                    effective_asset_resolver
+                ),
+            )
+        )
+
+        market_resolver = (
+            RadarAIMarketResolver()
+        )
 
         effective_asset_provider = (
             crypto_asset_analysis_provider
@@ -66,6 +85,9 @@ class RadarAICryptoV1ApplicationFactory:
             service = (
                 RadarAIAssetContextService(
                     provider=provider,
+                    asset_resolver=(
+                        effective_asset_resolver
+                    ),
                 )
             )
 
