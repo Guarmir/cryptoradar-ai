@@ -8,6 +8,7 @@ class AssistantIntent(
 ):
     PRODUCT_HELP = "product_help"
     MARKET_OVERVIEW = "market_overview"
+    ASSET_ANALYSIS = "asset_analysis"
     UNKNOWN = "unknown"
 
 
@@ -26,6 +27,7 @@ _MARKET_OVERVIEW_PHRASES = (
     "o que esta acontecendo no mercado",
     "o que esta chamando atencao",
 )
+
 
 _PRODUCT_HELP_PHRASES = (
     "como usar",

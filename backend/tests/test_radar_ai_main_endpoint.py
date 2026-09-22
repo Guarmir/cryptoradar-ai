@@ -81,6 +81,7 @@ def test_main_app_runs_radar_ai_endpoint(
     )
 
     assert body["market"] == "crypto"
+
     assert body["supported"] is True
 
     assert body["source"] == (
@@ -88,9 +89,83 @@ def test_main_app_runs_radar_ai_endpoint(
     )
 
     assert body["answer"]
+
     assert isinstance(
-    body["answer"],
-    str,
+        body["answer"],
+        str,
     )
+
+    assert body["items"]
+
+
+def test_main_app_runs_asset_analysis_endpoint(
+    monkeypatch,
+) -> None:
+    class FakeMarketOverviewProvider:
+        pass
+
+    class FakeAssetProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            assert asset_id == "uniswap"
+
+            return {
+                "id": "uniswap",
+                "symbol": "uni",
+                "name": "Uniswap",
+                "current_price": 12.50,
+                "market_cap": 7_500_000_000,
+                "total_volume": 650_000_000,
+                "price_change_percentage_24h": 4.2,
+            }
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CoinGeckoMarketOverviewProvider",
+        FakeMarketOverviewProvider,
+    )
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CryptoAssetAnalysisProvider",
+        FakeAssetProvider,
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ai/radar/ask",
+        json={
+            "question": "Como está a UNI?",
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["question"] == (
+        "Como está a UNI?"
+    )
+
+    assert body["intent"] == (
+        "asset_analysis"
+    )
+
+    assert body["market"] == "crypto"
+
+    assert body["supported"] is True
+
+    assert body["source"] == (
+        "cryptoradar_asset_analysis"
+    )
+
+    assert body["source_version"] == "v1"
+
+    assert body["answer"]
+
+    assert "Uniswap" in body["answer"]
 
     assert body["items"]

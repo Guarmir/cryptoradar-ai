@@ -7,6 +7,10 @@ from app.ai.coingecko_market_overview_provider import (
     CoinGeckoMarketOverviewProvider,
     MarketOverviewDataError,
 )
+from app.ai.crypto_asset_analysis_provider import (
+    AssetAnalysisDataError,
+    CryptoAssetAnalysisProvider,
+)
 from app.ai.radar_ai_answer_composer import (
     RadarAIAnswerComposer,
 )
@@ -63,15 +67,22 @@ def ask_radar_ai(
     effective_orchestrator = orchestrator
 
     if effective_orchestrator is None:
-        provider = (
+        market_overview_provider = (
             CoinGeckoMarketOverviewProvider()
+        )
+
+        asset_analysis_provider = (
+            CryptoAssetAnalysisProvider()
         )
 
         effective_orchestrator = (
             RadarAICryptoV1ApplicationFactory
             .create(
                 crypto_market_overview_provider=(
-                    provider
+                    market_overview_provider
+                ),
+                crypto_asset_analysis_provider=(
+                    asset_analysis_provider
                 ),
             )
         )
@@ -95,7 +106,10 @@ def ask_radar_ai(
             detail=str(error),
         ) from error
 
-    except MarketOverviewDataError as error:
+    except (
+        MarketOverviewDataError,
+        AssetAnalysisDataError,
+    ) as error:
         raise HTTPException(
             status_code=503,
             detail=str(error),

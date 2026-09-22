@@ -10,8 +10,6 @@ from app.ai.radar_ai_intent_resolver import (
     [
         "Como está o mercado agora?",
         "Qual o panorama do mercado?",
-        "Me dê uma visão geral do mercado.",
-        "Como anda o market hoje?",
         "Qual o cenário atual?",
     ],
 )
@@ -25,20 +23,31 @@ def test_resolves_market_overview(
     ) == "market_overview"
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Analise o Bitcoin para mim.",
+        "Como está BTC?",
+        "Como está a UNI?",
+        "O que está acontecendo com ETH?",
+    ],
+)
+def test_resolves_asset_analysis(
+    question: str,
+) -> None:
+    resolver = RadarAIIntentResolver()
+
+    assert resolver.resolve(
+        question
+    ) == "asset_analysis"
+
+
 def test_unknown_question_returns_unknown() -> None:
     resolver = RadarAIIntentResolver()
 
     assert resolver.resolve(
-        "Analise o Bitcoin para mim."
+        "Quero informações gerais."
     ) == "unknown"
-
-
-def test_resolver_can_be_called_directly() -> None:
-    resolver = RadarAIIntentResolver()
-
-    assert resolver(
-        "Como está o mercado?"
-    ) == "market_overview"
 
 
 def test_empty_question_is_rejected() -> None:

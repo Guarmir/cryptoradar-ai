@@ -11,6 +11,9 @@ from app.ai.assistant_intent import (
 from app.ai.coingecko_market_overview_provider import (
     MarketOverviewDataError,
 )
+from app.ai.crypto_asset_analysis_provider import (
+    AssetAnalysisDataError,
+)
 from app.ai.radar_ai_api import (
     RadarAIQuestionRequest,
     ask_radar_ai,
@@ -33,6 +36,28 @@ def _context() -> AssistantContext:
                 title="Resumo do mercado",
                 content=(
                     "Mercado cripto disponível."
+                ),
+            ),
+        ),
+    )
+
+
+def _asset_context() -> AssistantContext:
+    return AssistantContext(
+        intent=(
+            AssistantIntent.ASSET_ANALYSIS
+        ),
+        source=(
+            "cryptoradar_asset_analysis"
+        ),
+        source_version="v1",
+        items=(
+            AssistantContextItem(
+                key="asset_summary",
+                title="Resumo do ativo",
+                content=(
+                    "Uniswap (UNI): "
+                    "cenário de mercado disponível."
                 ),
             ),
         ),
@@ -88,6 +113,54 @@ def test_api_returns_orchestrated_context() -> None:
     )
 
 
+def test_api_returns_asset_analysis() -> None:
+    provider = object()
+
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            return (
+                RadarAIOrchestrationResult(
+                    question=question,
+                    intent="asset_analysis",
+                    market="crypto",
+                    provider=provider,
+                    context=_asset_context(),
+                )
+            )
+
+    response = ask_radar_ai(
+        RadarAIQuestionRequest(
+            question="Como está a UNI?",
+        ),
+        orchestrator=FakeOrchestrator(),
+    )
+
+    assert response.question == (
+        "Como está a UNI?"
+    )
+
+    assert response.intent == (
+        "asset_analysis"
+    )
+
+    assert response.market == "crypto"
+
+    assert response.source == (
+        "cryptoradar_asset_analysis"
+    )
+
+    assert response.source_version == "v1"
+
+    assert "Uniswap" in response.answer
+
+    assert response.items[0].key == (
+        "asset_summary"
+    )
+
+
 def test_api_maps_invalid_request_to_422() -> None:
     class FakeOrchestrator:
         def orchestrate(
@@ -103,7 +176,7 @@ def test_api_maps_invalid_request_to_422() -> None:
     ) as captured:
         ask_radar_ai(
             RadarAIQuestionRequest(
-                question="Analise BTC",
+                question="Pergunta inválida",
             ),
             orchestrator=(
                 FakeOrchestrator()
@@ -134,6 +207,34 @@ def test_api_maps_market_error_to_503() -> None:
                 question=(
                     "Como está o mercado?"
                 ),
+            ),
+            orchestrator=(
+                FakeOrchestrator()
+            ),
+        )
+
+    assert (
+        captured.value.status_code
+        == 503
+    )
+
+
+def test_api_maps_asset_error_to_503() -> None:
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            raise AssetAnalysisDataError(
+                "Dados do ativo indisponíveis."
+            )
+
+    with pytest.raises(
+        HTTPException,
+    ) as captured:
+        ask_radar_ai(
+            RadarAIQuestionRequest(
+                question="Como está a UNI?",
             ),
             orchestrator=(
                 FakeOrchestrator()
