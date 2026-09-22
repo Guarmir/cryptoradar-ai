@@ -9,6 +9,7 @@ class RadarAIAssetFocusResolver:
     PRICE = "price"
     CHANGE = "change"
     VOLUME = "volume"
+    MARKET_CAP = "market_cap"
     INVALIDATION = "invalidation"
     EXPLANATION = "explanation"
 
@@ -49,6 +50,12 @@ class RadarAIAssetFocusResolver:
         "perigo",
     )
 
+    _MARKET_CAP_TERMS = (
+        "capitalizacao",
+        "market cap",
+        "valor de mercado",
+    )
+
     _PRICE_TERMS = (
         "preco",
         "price",
@@ -62,6 +69,10 @@ class RadarAIAssetFocusResolver:
         "mudanca",
         "change",
         "24h",
+        "alta",
+        "queda",
+        "subiu",
+        "caiu",
     )
 
     _VOLUME_TERMS = (
@@ -88,13 +99,6 @@ class RadarAIAssetFocusResolver:
                 "question must not be empty"
             )
 
-        # Explicação precisa ser detectada
-        # antes de score/sinal.
-        #
-        # Exemplo:
-        # "Por que a UNI está com esse sinal?"
-        # deve virar explanation,
-        # e não apenas signal.
         if self._contains_any(
             normalized,
             self._EXPLANATION_TERMS,
@@ -118,6 +122,15 @@ class RadarAIAssetFocusResolver:
             self._RISK_TERMS,
         ):
             return self.RISK
+
+        # Capitalização vem antes de preço
+        # para que "valor de mercado" não
+        # seja interpretado como preço.
+        if self._contains_any(
+            normalized,
+            self._MARKET_CAP_TERMS,
+        ):
+            return self.MARKET_CAP
 
         if self._contains_any(
             normalized,

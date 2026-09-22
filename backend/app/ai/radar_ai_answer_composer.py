@@ -3,6 +3,9 @@ from typing import Any, Optional
 from app.ai.assistant_intent import (
     AssistantIntent,
 )
+from app.ai.radar_ai_asset_comparison_conclusion_composer import (
+    RadarAIAssetComparisonConclusionComposer,
+)
 from app.ai.radar_ai_asset_focus_resolver import (
     RadarAIAssetFocusResolver,
 )
@@ -15,10 +18,20 @@ class RadarAIAnswerComposer:
         asset_focus_resolver: Optional[
             RadarAIAssetFocusResolver
         ] = None,
+        comparison_conclusion_composer: Optional[
+            RadarAIAssetComparisonConclusionComposer
+        ] = None,
     ) -> None:
         self._asset_focus_resolver = (
             asset_focus_resolver
             or RadarAIAssetFocusResolver()
+        )
+
+        self._comparison_conclusion_composer = (
+            comparison_conclusion_composer
+            or (
+                RadarAIAssetComparisonConclusionComposer()
+            )
         )
 
     def compose(
@@ -118,6 +131,12 @@ class RadarAIAnswerComposer:
             ): (
                 "asset_risks",
                 "asset_invalidation",
+            ),
+            (
+                RadarAIAssetFocusResolver
+                .MARKET_CAP
+            ): (
+                "asset_market_cap",
             ),
             (
                 RadarAIAssetFocusResolver
@@ -224,6 +243,12 @@ class RadarAIAnswerComposer:
             ),
             (
                 RadarAIAssetFocusResolver
+                .MARKET_CAP
+            ): (
+                "market_cap",
+            ),
+            (
+                RadarAIAssetFocusResolver
                 .PRICE
             ): (
                 "price",
@@ -296,25 +321,41 @@ class RadarAIAnswerComposer:
                     )
 
             if contents:
-                block = "\n".join(
-                    (
-                        identity,
-                        *contents,
+                asset_blocks.append(
+                    "\n".join(
+                        (
+                            identity,
+                            *contents,
+                        )
                     )
                 )
 
-                asset_blocks.append(
-                    block
-                )
-
-        if asset_blocks:
-            return "\n\n".join(
-                asset_blocks
+        if not asset_blocks:
+            return self._compose_all_items(
+                context
             )
 
-        return self._compose_all_items(
-            context
+        comparison_body = "\n\n".join(
+            asset_blocks
         )
+
+        conclusion = (
+            self
+            ._comparison_conclusion_composer
+            .compose(
+                context=context,
+                question=question,
+                focus=focus,
+            )
+        )
+
+        if conclusion:
+            return (
+                f"{conclusion}\n\n"
+                f"{comparison_body}"
+            )
+
+        return comparison_body
 
     @staticmethod
     def _compose_all_items(

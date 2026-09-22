@@ -432,3 +432,98 @@ def test_main_app_returns_asset_comparison_answer(
 
     assert "12.50000000" not in answer
     assert "180.00000000" not in answer
+
+def test_main_app_returns_quantitative_comparison_conclusion(
+    monkeypatch,
+) -> None:
+    class FakeMarketOverviewProvider:
+        pass
+
+    markets = {
+        "uniswap": {
+            "id": "uniswap",
+            "symbol": "uni",
+            "name": "Uniswap",
+            "current_price": 12.50,
+            "market_cap": 7_500_000_000,
+            "total_volume": 650_000_000,
+            "price_change_percentage_24h": 4.2,
+        },
+        "solana": {
+            "id": "solana",
+            "symbol": "sol",
+            "name": "Solana",
+            "current_price": 180.0,
+            "market_cap": 85_000_000_000,
+            "total_volume": 4_500_000_000,
+            "price_change_percentage_24h": 2.1,
+        },
+    }
+
+    class FakeAssetProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            return markets[asset_id]
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CoinGeckoMarketOverviewProvider",
+        FakeMarketOverviewProvider,
+    )
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CryptoAssetAnalysisProvider",
+        FakeAssetProvider,
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ai/radar/ask",
+        json={
+            "question": (
+                "Qual tem maior volume "
+                "entre UNI e SOL?"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["intent"] == (
+        "asset_comparison"
+    )
+
+    assert body["market"] == "crypto"
+
+    assert body["source"] == (
+        "cryptoradar_asset_comparison"
+    )
+
+    answer = body["answer"]
+
+    assert (
+        "Solana (SOL) apresenta "
+        "maior volume em 24h"
+        in answer
+    )
+
+    assert (
+        "US$ 3,850,000,000"
+        in answer
+    )
+
+    assert (
+        "US$ 4,500,000,000"
+        in answer
+    )
+
+    assert (
+        "US$ 650,000,000"
+        in answer
+    )
