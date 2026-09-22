@@ -87,4 +87,10 @@ def test_main_app_runs_radar_ai_endpoint(
         "cryptoradar_market_overview"
     )
 
+    assert body["answer"]
+    assert isinstance(
+    body["answer"],
+    str,
+    )
+
     assert body["items"]

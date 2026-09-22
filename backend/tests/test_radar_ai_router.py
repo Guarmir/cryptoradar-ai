@@ -83,6 +83,9 @@ def test_post_radar_ai_ask_endpoint() -> None:
     assert body["market"] == "crypto"
     assert body["supported"] is True
     assert body["source"] == "coingecko"
+    assert body["answer"] == (
+    "Mercado cripto disponível."
+    )
 
     assert len(body["items"]) == 1
 
