@@ -16,6 +16,9 @@ class RadarAIAssetFocusResolver:
     OPERATIONAL_RANGE = "operational_range"
     RANGE_POSITION = "range_position"
     RANGE_SPACE = "range_space"
+    RANGE_QUALITY = "range_quality"
+    RANGE_INVALIDATION = "range_invalidation"
+    RANGE_CONTEXT = "range_context"
 
     _EXPLANATION_TERMS = (
         "por que",
@@ -47,17 +50,43 @@ class RadarAIAssetFocusResolver:
         "tendencia",
     )
 
+    _MARKET_CAP_TERMS = (
+        "capitalizacao",
+        "market cap",
+        "valor de mercado",
+    )
+
+    _RANGE_QUALITY_TERMS = (
+        "qualidade da faixa",
+        "qualidade operacional",
+        "forca da faixa",
+        "faixa forte",
+        "faixa fraca",
+        "estrutura da faixa",
+    )
+
+    _RANGE_INVALIDATION_TERMS = (
+        "risco de invalidacao da faixa",
+        "invalidacao da faixa",
+        "faixa invalidada",
+        "faixa esta invalidada",
+        "dinamica invalidada",
+        "invalidar a faixa",
+    )
+
+    _RANGE_CONTEXT_TERMS = (
+        "contexto operacional",
+        "cenario operacional da faixa",
+        "leitura operacional da faixa",
+        "contexto consolidado",
+        "estrutura operacional",
+    )
+
     _RISK_TERMS = (
         "risco",
         "riscos",
         "risk",
         "perigo",
-    )
-
-    _MARKET_CAP_TERMS = (
-        "capitalizacao",
-        "market cap",
-        "valor de mercado",
     )
 
     _INVALIDATION_TERMS = (
@@ -158,15 +187,33 @@ class RadarAIAssetFocusResolver:
 
         if self._contains_any(
             normalized,
-            self._RISK_TERMS,
-        ):
-            return self.RISK
-
-        if self._contains_any(
-            normalized,
             self._MARKET_CAP_TERMS,
         ):
             return self.MARKET_CAP
+
+        if self._contains_any(
+            normalized,
+            self._RANGE_QUALITY_TERMS,
+        ):
+            return self.RANGE_QUALITY
+
+        if self._contains_any(
+            normalized,
+            self._RANGE_INVALIDATION_TERMS,
+        ):
+            return self.RANGE_INVALIDATION
+
+        if self._contains_any(
+            normalized,
+            self._RANGE_CONTEXT_TERMS,
+        ):
+            return self.RANGE_CONTEXT
+
+        if self._contains_any(
+            normalized,
+            self._RISK_TERMS,
+        ):
+            return self.RISK
 
         if self._contains_any(
             normalized,

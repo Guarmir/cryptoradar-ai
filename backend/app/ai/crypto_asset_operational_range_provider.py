@@ -90,10 +90,98 @@ class CryptoAssetOperationalRangeProvider:
             )
         )
 
+    def fetch_historical_average_volume(
+        self,
+        *,
+        asset_id: str,
+    ) -> Optional[float]:
+        chart_data = (
+            self._load_chart_data(
+                asset_id
+            )
+        )
+
+        if chart_data is None:
+            return None
+
+        raw_volumes = chart_data.get(
+            "total_volumes",
+            [],
+        )
+
+        if not isinstance(
+            raw_volumes,
+            list,
+        ):
+            return None
+
+        values = []
+
+        for point in raw_volumes:
+            value = self._extract_value(
+                point
+            )
+
+            if (
+                value is not None
+                and value > 0
+            ):
+                values.append(
+                    value
+                )
+
+        if not values:
+            return None
+
+        return (
+            sum(values)
+            / len(values)
+        )
+
     def _load_prices(
         self,
         asset_id: str,
     ) -> Optional[tuple[float, ...]]:
+        chart_data = (
+            self._load_chart_data(
+                asset_id
+            )
+        )
+
+        if chart_data is None:
+            return None
+
+        raw_prices = chart_data.get(
+            "prices",
+            [],
+        )
+
+        if not isinstance(
+            raw_prices,
+            list,
+        ):
+            return None
+
+        prices = []
+
+        for point in raw_prices:
+            price = self._extract_value(
+                point
+            )
+
+            if price is not None:
+                prices.append(
+                    price
+                )
+
+        return tuple(
+            prices
+        )
+
+    def _load_chart_data(
+        self,
+        asset_id: str,
+    ) -> Optional[dict]:
         normalized_asset_id = (
             asset_id.strip().lower()
         )
@@ -116,35 +204,10 @@ class CryptoAssetOperationalRangeProvider:
         ):
             return None
 
-        raw_prices = chart_data.get(
-            "prices",
-            [],
-        )
-
-        if not isinstance(
-            raw_prices,
-            list,
-        ):
-            return None
-
-        prices = []
-
-        for point in raw_prices:
-            price = self._extract_price(
-                point
-            )
-
-            if price is not None:
-                prices.append(
-                    price
-                )
-
-        return tuple(
-            prices
-        )
+        return chart_data
 
     @staticmethod
-    def _extract_price(
+    def _extract_value(
         point,
     ) -> Optional[float]:
         candidate = None
@@ -167,6 +230,7 @@ class CryptoAssetOperationalRangeProvider:
         ):
             candidate = (
                 point.get("price")
+                or point.get("volume")
                 or point.get("value")
             )
 

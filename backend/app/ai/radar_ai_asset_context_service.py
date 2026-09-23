@@ -1,5 +1,10 @@
 from typing import Optional
 
+from app.ai.asset_operational_range_intelligence_assessment import (
+    calculate_asset_operational_range_context,
+    calculate_asset_operational_range_invalidation,
+    calculate_asset_operational_range_quality,
+)
 from app.ai.asset_risk_assessment import (
     calculate_asset_risk_assessment,
 )
@@ -272,11 +277,23 @@ class RadarAIAssetContextService:
             )
         )
 
-        if focus in {
+        range_focuses = {
             RadarAIAssetFocusResolver.OPERATIONAL_RANGE,
             RadarAIAssetFocusResolver.RANGE_POSITION,
             RadarAIAssetFocusResolver.RANGE_SPACE,
-        }:
+            RadarAIAssetFocusResolver.RANGE_QUALITY,
+            RadarAIAssetFocusResolver.RANGE_INVALIDATION,
+            RadarAIAssetFocusResolver.RANGE_CONTEXT,
+        }
+
+        deep_focuses = {
+            RadarAIAssetFocusResolver.OPERATIONAL_RANGE,
+            RadarAIAssetFocusResolver.RANGE_QUALITY,
+            RadarAIAssetFocusResolver.RANGE_INVALIDATION,
+            RadarAIAssetFocusResolver.RANGE_CONTEXT,
+        }
+
+        if focus in range_focuses:
             range_assessment = (
                 self._operational_range_provider.fetch(
                     asset_id=asset_id,
@@ -285,12 +302,13 @@ class RadarAIAssetContextService:
             )
 
             recurrence_assessment = None
+            quality_assessment = None
+            invalidation_assessment = None
+            consolidated_context = None
 
             if (
                 range_assessment is not None
-                and focus
-                == RadarAIAssetFocusResolver
-                .OPERATIONAL_RANGE
+                and focus in deep_focuses
             ):
                 fetch_recurrence = getattr(
                     self._operational_range_provider,
@@ -308,6 +326,75 @@ class RadarAIAssetContextService:
                         )
                     )
 
+            if (
+                range_assessment is not None
+                and recurrence_assessment
+                is not None
+                and focus in deep_focuses
+            ):
+                historical_average_volume = (
+                    None
+                )
+
+                fetch_historical_volume = (
+                    getattr(
+                        self
+                        ._operational_range_provider,
+                        (
+                            "fetch_historical_"
+                            "average_volume"
+                        ),
+                        None,
+                    )
+                )
+
+                if callable(
+                    fetch_historical_volume
+                ):
+                    historical_average_volume = (
+                        fetch_historical_volume(
+                            asset_id=asset_id,
+                        )
+                    )
+
+                quality_assessment = (
+                    calculate_asset_operational_range_quality(
+                        recurrence=(
+                            recurrence_assessment
+                        ),
+                        current_volume=volume,
+                        market_cap=market_cap,
+                        historical_average_volume=(
+                            historical_average_volume
+                        ),
+                    )
+                )
+
+                invalidation_assessment = (
+                    calculate_asset_operational_range_invalidation(
+                        range_assessment=(
+                            range_assessment
+                        ),
+                        quality=(
+                            quality_assessment
+                        ),
+                    )
+                )
+
+                consolidated_context = (
+                    calculate_asset_operational_range_context(
+                        range_assessment=(
+                            range_assessment
+                        ),
+                        quality=(
+                            quality_assessment
+                        ),
+                        invalidation=(
+                            invalidation_assessment
+                        ),
+                    )
+                )
+
             items.extend(
                 self._build_operational_range_items(
                     name=name,
@@ -316,6 +403,15 @@ class RadarAIAssetContextService:
                     ),
                     recurrence_assessment=(
                         recurrence_assessment
+                    ),
+                    quality_assessment=(
+                        quality_assessment
+                    ),
+                    invalidation_assessment=(
+                        invalidation_assessment
+                    ),
+                    consolidated_context=(
+                        consolidated_context
                     ),
                 )
             )
@@ -339,6 +435,9 @@ class RadarAIAssetContextService:
         name: str,
         assessment,
         recurrence_assessment=None,
+        quality_assessment=None,
+        invalidation_assessment=None,
+        consolidated_context=None,
     ) -> tuple[
         AssistantContextItem,
         ...,
@@ -388,7 +487,7 @@ class RadarAIAssetContextService:
                 f"{RadarAIAssetContextService._build_recurrence_text(recurrence_assessment)}"
             )
 
-        return (
+        items = [
             AssistantContextItem(
                 key=(
                     "asset_operational_range"
@@ -423,7 +522,74 @@ class RadarAIAssetContextService:
                     f"{assessment.distance_to_upper_percent:.2f}%."
                 ),
             ),
-        )
+        ]
+
+        if quality_assessment is not None:
+            items.append(
+                AssistantContextItem(
+                    key=(
+                        "asset_operational_range_quality"
+                    ),
+                    title=(
+                        "Qualidade da faixa"
+                    ),
+                    content=(
+                        RadarAIAssetContextService
+                        ._build_quality_text(
+                            name=name,
+                            assessment=(
+                                quality_assessment
+                            ),
+                        )
+                    ),
+                )
+            )
+
+        if invalidation_assessment is not None:
+            items.append(
+                AssistantContextItem(
+                    key=(
+                        "asset_operational_range_invalidation"
+                    ),
+                    title=(
+                        "Risco de invalidação "
+                        "da faixa"
+                    ),
+                    content=(
+                        RadarAIAssetContextService
+                        ._build_invalidation_text(
+                            name=name,
+                            assessment=(
+                                invalidation_assessment
+                            ),
+                        )
+                    ),
+                )
+            )
+
+        if consolidated_context is not None:
+            items.append(
+                AssistantContextItem(
+                    key=(
+                        "asset_operational_range_context"
+                    ),
+                    title=(
+                        "Contexto operacional "
+                        "consolidado"
+                    ),
+                    content=(
+                        RadarAIAssetContextService
+                        ._build_context_text(
+                            name=name,
+                            assessment=(
+                                consolidated_context
+                            ),
+                        )
+                    ),
+                )
+            )
+
+        return tuple(items)
 
     @staticmethod
     def _build_recurrence_text(
@@ -472,4 +638,130 @@ class RadarAIAssetContextService:
             f"é insuficiente para confirmar "
             f"comportamento repetitivo "
             f"entre os dois limites."
+        )
+
+    @staticmethod
+    def _build_quality_text(
+        *,
+        name: str,
+        assessment,
+    ) -> str:
+        labels = {
+            "strong": "forte",
+            "acceptable": "aceitável",
+            "under_observation": (
+                "em observação"
+            ),
+            "weak": "fraca",
+        }
+
+        label = labels.get(
+            assessment.state,
+            assessment.state,
+        )
+
+        return (
+            f"A qualidade operacional "
+            f"da faixa de {name} é "
+            f"{label}. "
+            f"Confirmação por volume: "
+            f"{assessment.volume_confirmation_state}. "
+            f"Liquidez observada: "
+            f"{assessment.liquidity_state}."
+        )
+
+    @staticmethod
+    def _build_invalidation_text(
+        *,
+        name: str,
+        assessment,
+    ) -> str:
+        labels = {
+            "low": "baixo",
+            "moderate": "moderado",
+            "high": "alto",
+            "invalidated": "invalidada",
+        }
+
+        label = labels.get(
+            assessment.state,
+            assessment.state,
+        )
+
+        if assessment.is_invalidated:
+            return (
+                f"A faixa observada de {name} "
+                f"está invalidada porque o "
+                f"preço atual saiu dos limites "
+                f"utilizados no cálculo."
+            )
+
+        return (
+            f"O risco estrutural observado "
+            f"de invalidação da faixa de "
+            f"{name} é {label}. "
+            f"Esse indicador descreve a "
+            f"estrutura da faixa e não o "
+            f"risco total do ativo."
+        )
+
+    @staticmethod
+    def _build_context_text(
+        *,
+        name: str,
+        assessment,
+    ) -> str:
+        labels = {
+            "organized": (
+                "organizado"
+            ),
+            "usable": (
+                "utilizável, mas sem "
+                "confirmação forte"
+            ),
+            "under_observation": (
+                "em observação"
+            ),
+            "invalidated": (
+                "invalidado"
+            ),
+        }
+
+        zones = {
+            "below_range": (
+                "abaixo da faixa"
+            ),
+            "lower": (
+                "região inferior"
+            ),
+            "middle": (
+                "região central"
+            ),
+            "upper": (
+                "região superior"
+            ),
+            "above_range": (
+                "acima da faixa"
+            ),
+        }
+
+        state_label = labels.get(
+            assessment.state,
+            assessment.state,
+        )
+
+        zone_label = zones.get(
+            assessment.position_zone,
+            assessment.position_zone,
+        )
+
+        return (
+            f"O contexto operacional "
+            f"consolidado de {name} está "
+            f"{state_label}. "
+            f"O preço está na "
+            f"{zone_label}. "
+            f"Essa leitura é observacional "
+            f"e não representa recomendação "
+            f"de compra ou venda."
         )

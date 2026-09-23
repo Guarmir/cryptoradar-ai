@@ -102,6 +102,13 @@ class RadarAIAssetResolver:
         "visao",
         "volume",
         "vs",
+        "contexto",
+        "estrutura",
+        "forte",
+        "fraca",
+        "forca",
+        "qualidade",
+        "invalidada",
     }
 
     _DYNAMIC_ASSET_CUES = (
@@ -134,6 +141,10 @@ class RadarAIAssetResolver:
         "recorrente",
         "oscilacao",
         "toques",
+        "contexto",
+        "estrutura",
+        "qualidade",
+        "invalidada",
     )
 
     def __init__(

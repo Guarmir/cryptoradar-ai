@@ -205,6 +205,42 @@ class RadarAIAnswerComposer:
                 "asset_risks",
                 "asset_invalidation",
             ),
+            (
+                RadarAIAssetFocusResolver
+                .OPERATIONAL_RANGE
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_position",
+                "asset_operational_range_space",
+                "asset_operational_range_quality",
+                "asset_operational_range_invalidation",
+                "asset_operational_range_context",
+            ),
+            (
+                RadarAIAssetFocusResolver
+                .RANGE_QUALITY
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_quality",
+            ),
+            (
+                RadarAIAssetFocusResolver
+                .RANGE_INVALIDATION
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_invalidation",
+            ),
+            (
+                RadarAIAssetFocusResolver
+                .RANGE_CONTEXT
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_position",
+                "asset_operational_range_space",
+                "asset_operational_range_quality",
+                "asset_operational_range_invalidation",
+                "asset_operational_range_context",
+            ),
         }
 
         selected_keys = (
