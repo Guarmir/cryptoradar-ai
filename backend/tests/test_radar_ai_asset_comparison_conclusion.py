@@ -85,6 +85,27 @@ def _context() -> AssistantContext:
             ),
             AssistantContextItem(
                 key=(
+                    "comparison_asset_1_risk_score"
+                ),
+                title="Risk Score",
+                content=(
+                    "Uniswap: Risk Score "
+                    "42/100 — risco moderado."
+                ),
+            ),
+            AssistantContextItem(
+                key=(
+                    "comparison_asset_1_risk_factors"
+                ),
+                title="Fatores de risco",
+                content=(
+                    "Capitalização intermediária; "
+                    "liquidez moderada; "
+                    "volatilidade moderada."
+                ),
+            ),
+            AssistantContextItem(
+                key=(
                     "comparison_asset_1_risks"
                 ),
                 title="Riscos",
@@ -158,6 +179,27 @@ def _context() -> AssistantContext:
                 title="Score",
                 content=(
                     "Solana: score 70/100."
+                ),
+            ),
+            AssistantContextItem(
+                key=(
+                    "comparison_asset_2_risk_score"
+                ),
+                title="Risk Score",
+                content=(
+                    "Solana: Risk Score "
+                    "31/100 — risco moderado."
+                ),
+            ),
+            AssistantContextItem(
+                key=(
+                    "comparison_asset_2_risk_factors"
+                ),
+                title="Fatores de risco",
+                content=(
+                    "Capitalização elevada; "
+                    "boa liquidez relativa; "
+                    "volatilidade moderada."
                 ),
             ),
             AssistantContextItem(
@@ -252,7 +294,7 @@ def test_quantitative_comparison_conclusion(
     assert difference in answer
 
 
-def test_risk_does_not_invent_numeric_winner() -> None:
+def test_risk_uses_numeric_risk_score() -> None:
     composer = RadarAIAnswerComposer()
 
     answer = composer.compose(
@@ -264,10 +306,12 @@ def test_risk_does_not_invent_numeric_winner() -> None:
     )
 
     assert (
-        "ainda não possui uma "
-        "métrica numérica de risco"
+        "Solana (SOL) apresenta "
+        "menor Risk Score"
         in answer
     )
+
+    assert "11 pontos" in answer
 
     assert "Risco de correção" in answer
 

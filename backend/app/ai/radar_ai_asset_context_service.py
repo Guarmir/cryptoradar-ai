@@ -22,6 +22,9 @@ from app.services.asset_analysis_service import (
 from app.services.market_data_service import (
     safe_float,
 )
+from app.ai.asset_risk_assessment import (
+    calculate_asset_risk_assessment,
+)
 
 
 ASSET_ANALYSIS_SOURCE = (
@@ -103,6 +106,14 @@ class RadarAIAssetContextService:
             score,
             market_cap,
             volume,
+        )
+
+        risk_assessment = (
+            calculate_asset_risk_assessment(
+                change_24h=change_24h,
+                volume=volume,
+                market_cap=market_cap,
+            )
         )
 
         (
@@ -199,6 +210,23 @@ class RadarAIAssetContextService:
                 title="Fatores observados",
                 content="; ".join(
                     reasons
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_risk_score",
+                title="Risk Score",
+                content=(
+                    f"Risk Score de {name}: "
+                    f"{risk_assessment.score}/100 "
+                    f"— risco "
+                    f"{risk_assessment.level}."
+                ),
+            ),
+            AssistantContextItem(
+                key="asset_risk_factors",
+                title="Fatores de risco",
+                content="; ".join(
+                    risk_assessment.factors
                 ),
             ),
             AssistantContextItem(

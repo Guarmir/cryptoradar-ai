@@ -19,6 +19,9 @@ from app.services.asset_analysis_service import (
 from app.services.market_data_service import (
     safe_float,
 )
+from app.ai.asset_risk_assessment import (
+    calculate_asset_risk_assessment,
+)
 
 
 ASSET_COMPARISON_SOURCE = (
@@ -139,6 +142,14 @@ class RadarAIAssetComparisonContextService:
             volume,
         )
 
+        risk_assessment = (
+            calculate_asset_risk_assessment(
+                change_24h=change_24h,
+                volume=volume,
+                market_cap=market_cap,
+            )
+        )
+
         (
             summary,
             reasons,
@@ -244,6 +255,23 @@ class RadarAIAssetComparisonContextService:
                     "; ".join(reasons)
                 ),
             ),
+            AssistantContextItem(
+                key=f"{prefix}_risk_score",
+                title="Risk Score",
+                content=(
+                    f"{name}: Risk Score "
+                    f"{risk_assessment.score}/100 "
+                    f"— risco "
+                    f"{risk_assessment.level}."
+                ),
+            ),
+            AssistantContextItem(
+                key=f"{prefix}_risk_factors",
+                title="Fatores de risco",
+                content="; ".join(
+                    risk_assessment.factors
+                ),
+            ),           
             AssistantContextItem(
                 key=f"{prefix}_risks",
                 title="Riscos",

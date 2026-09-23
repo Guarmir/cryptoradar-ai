@@ -527,3 +527,89 @@ def test_main_app_returns_quantitative_comparison_conclusion(
         "US$ 650,000,000"
         in answer
     )
+def test_main_app_returns_risk_score_comparison(
+    monkeypatch,
+) -> None:
+    class FakeMarketOverviewProvider:
+        pass
+
+    markets = {
+        "uniswap": {
+            "id": "uniswap",
+            "symbol": "uni",
+            "name": "Uniswap",
+            "current_price": 12.50,
+            "market_cap": 7_500_000_000,
+            "total_volume": 650_000_000,
+            "price_change_percentage_24h": 4.2,
+        },
+        "solana": {
+            "id": "solana",
+            "symbol": "sol",
+            "name": "Solana",
+            "current_price": 180.0,
+            "market_cap": 85_000_000_000,
+            "total_volume": 4_500_000_000,
+            "price_change_percentage_24h": 2.1,
+        },
+    }
+
+    class FakeAssetProvider:
+        def fetch(
+            self,
+            asset_id: str,
+        ):
+            return markets[asset_id]
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CoinGeckoMarketOverviewProvider",
+        FakeMarketOverviewProvider,
+    )
+
+    monkeypatch.setattr(
+        radar_ai_api,
+        "CryptoAssetAnalysisProvider",
+        FakeAssetProvider,
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/ai/radar/ask",
+        json={
+            "question": (
+                "Qual apresenta menor risco, "
+                "UNI ou SOL?"
+            ),
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["intent"] == (
+        "asset_comparison"
+    )
+
+    assert body["source"] == (
+        "cryptoradar_asset_comparison"
+    )
+
+    answer = body["answer"]
+
+    assert "Risk Score" in answer
+
+    assert "Uniswap (UNI)" in answer
+    assert "Solana (SOL)" in answer
+
+    assert (
+        "apresenta menor Risk Score"
+        in answer
+    )
+
+    assert (
+        "métrica numérica de risco"
+        not in answer
+    )

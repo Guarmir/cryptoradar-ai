@@ -129,6 +129,8 @@ class RadarAIAnswerComposer:
                 RadarAIAssetFocusResolver
                 .RISK
             ): (
+                "asset_risk_score",
+                "asset_risk_factors",
                 "asset_risks",
                 "asset_invalidation",
             ),
@@ -238,6 +240,8 @@ class RadarAIAnswerComposer:
                 RadarAIAssetFocusResolver
                 .RISK
             ): (
+                "risk_score",
+                "risk_factors",
                 "risks",
                 "invalidation",
             ),

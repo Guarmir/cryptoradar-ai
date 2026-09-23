@@ -33,6 +33,7 @@ class RadarAIAssetComparisonConclusionComposer:
             CHANGE,
             VOLUME,
             MARKET_CAP,
+            RISK,
         }
     )
 
@@ -54,16 +55,6 @@ class RadarAIAssetComparisonConclusionComposer:
 
         if direction is None:
             return None
-
-        if focus == self.RISK:
-            return (
-                "Os riscos dos dois ativos podem "
-                "ser comparados qualitativamente, "
-                "mas o contexto atual ainda não "
-                "possui uma métrica numérica de "
-                "risco para indicar qual deles "
-                "apresenta menor risco."
-            )
 
         if (
             focus
@@ -124,6 +115,24 @@ class RadarAIAssetComparisonConclusionComposer:
             first_value
             - second_value
         )
+
+        if focus == self.RISK:
+            comparison_word = (
+                "maior"
+                if direction == "higher"
+                else "menor"
+            )
+
+            return (
+                f"{winner_name} apresenta "
+                f"{comparison_word} Risk Score "
+                f"entre os dois ativos. "
+                f"Diferença: "
+                f"{self._format_difference(
+                    focus,
+                    difference,
+                )}"
+            )
 
         comparison_word = (
             "maior"
@@ -209,8 +218,14 @@ class RadarAIAssetComparisonConclusionComposer:
             f"{prefix}_identity"
         )
 
+        metric_suffix = (
+            "risk_score"
+            if focus == cls.RISK
+            else focus
+        )
+
         content = items.get(
-            f"{prefix}_{focus}"
+            f"{prefix}_{metric_suffix}"
         )
 
         if (
@@ -238,9 +253,12 @@ class RadarAIAssetComparisonConclusionComposer:
         content: str,
         focus: str,
     ) -> Optional[float]:
-        if focus == cls.SCORE:
+        if focus in (
+            cls.SCORE,
+            cls.RISK,
+        ):
             match = re.search(
-                r"score\s+"
+                r"(?:score|risk score)\s+"
                 r"(-?\d+(?:[.,]\d+)?)"
                 r"/100",
                 content,
@@ -292,6 +310,7 @@ class RadarAIAssetComparisonConclusionComposer:
             cls.MARKET_CAP: (
                 "capitalização"
             ),
+            cls.RISK: "Risk Score",
         }
 
         return labels.get(
@@ -305,7 +324,10 @@ class RadarAIAssetComparisonConclusionComposer:
         focus: str,
         difference: float,
     ) -> str:
-        if focus == cls.SCORE:
+        if focus in (
+            cls.SCORE,
+            cls.RISK,
+        ):
             if difference.is_integer():
                 return (
                     f"{int(difference)} pontos."

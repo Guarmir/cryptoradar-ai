@@ -132,6 +132,8 @@ def test_asset_context_is_built_from_question() -> None:
         "asset_score",
         "asset_signal",
         "asset_reasons",
+        "asset_risk_score",
+        "asset_risk_factors",
         "asset_risks",
         "asset_invalidation",
     ]
