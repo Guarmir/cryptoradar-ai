@@ -9,65 +9,94 @@ from app.services.market_data_service import (
 
 
 class RadarAIAssetResolver:
-    _STOPWORDS = frozenset(
-        {
-            "a",
-            "agora",
-            "analise",
-            "analisar",
-            "ativo",
-            "ativos",
-            "bearish",
-            "bullish",
-            "cenario",
-            "como",
-            "com",
-            "cotacao",
-            "cripto",
-            "crypto",
-            "criptomoeda",
-            "criptomoedas",
-            "da",
-            "das",
-            "de",
-            "do",
-            "dos",
-            "esta",
-            "esse",
-            "essa",
-            "geral",
-            "gerais",
-            "hoje",
-            "informacoes",
-            "market",
-            "mercado",
-            "me",
-            "movimento",
-            "o",
-            "oportunidades",
-            "os",
-            "panorama",
-            "para",
-            "preco",
-            "qual",
-            "quais",
-            "risco",
-            "riscos",
-            "score",
-            "sentimento",
-            "sinal",
-            "situacao",
-            "sobre",
-            "tendencia",
-            "um",
-            "uma",
-            "valor",
-            "variacao",
-            "variou",
-            "visao",
-            "volume",
-        }
-    )
+    _STOPWORDS = {
+        "a",
+        "agora",
+        "algum",
+        "alguma",
+        "amplitude",
+        "analise",
+        "analisar",
+        "apresenta",
+        "ate",
+        "ativo",
+        "ativos",
+        "bearish",
+        "bullish",
+        "cenario",
+        "com",
+        "como",
+        "compare",
+        "comparacao",
+        "comparar",
+        "cotacao",
+        "cripto",
+        "criptomoeda",
+        "criptomoedas",
+        "crypto",
+        "da",
+        "das",
+        "de",
+        "dentro",
+        "distancia",
+        "do",
+        "dos",
+        "e",
+        "entre",
+        "espaco",
+        "essa",
+        "esse",
+        "esta",
+        "faixa",
+        "gerais",
+        "geral",
+        "hoje",
+        "inferior",
+        "informacao",
+        "informacoes",
+        "limite",
+        "maior",
+        "market",
+        "me",
+        "melhor",
+        "menor",
+        "mercado",
+        "movimento",
+        "o",
+        "onde",
+        "operacional",
+        "oportunidade",
+        "oportunidades",
+        "os",
+        "ou",
+        "panorama",
+        "para",
+        "posicao",
+        "preco",
+        "qual",
+        "quais",
+        "recente",
+        "resistencia",
+        "risco",
+        "riscos",
+        "score",
+        "sentimento",
+        "sinal",
+        "situacao",
+        "sobre",
+        "suporte",
+        "superior",
+        "tendencia",
+        "um",
+        "uma",
+        "valor",
+        "variacao",
+        "variou",
+        "versus",
+        "visao",
+        "volume",
+        "vs",
+    }
 
     _DYNAMIC_ASSET_CUES = (
         "analise",
@@ -87,13 +116,24 @@ class RadarAIAssetResolver:
         "bearish",
         "tendencia",
         "o que esta acontecendo com",
+        "faixa",
+        "amplitude",
+        "posicao",
+        "espaco",
+        "distancia",
+        "resistencia",
+        "suporte",
+        "limite",
     )
 
     def __init__(
         self,
         *,
         dynamic_coin_resolver: Optional[
-            Callable[[str], Optional[str]]
+            Callable[
+                [str],
+                Optional[str],
+            ]
         ] = None,
     ) -> None:
         self._dynamic_coin_resolver = (
@@ -129,14 +169,9 @@ class RadarAIAssetResolver:
                 normalized_question
             ]
 
-        tokens = re.findall(
-            r"[a-z0-9-]+",
-            normalized_question,
-        )
-
         known_asset = (
             self._resolve_known_asset(
-                tokens
+                normalized_question
             )
         )
 
@@ -155,6 +190,11 @@ class RadarAIAssetResolver:
             ] = None
 
             return None
+
+        tokens = re.findall(
+            r"[a-z0-9-]+",
+            normalized_question,
+        )
 
         candidates = [
             token
@@ -207,13 +247,22 @@ class RadarAIAssetResolver:
 
     @staticmethod
     def _resolve_known_asset(
-        tokens: list[str],
+        question: str,
     ) -> Optional[str]:
+        tokens = re.findall(
+            r"[a-z0-9-]+",
+            question,
+        )
+
         for token in tokens:
-            if token in PREFERRED_ALIASES:
-                return PREFERRED_ALIASES[
+            asset_id = (
+                PREFERRED_ALIASES.get(
                     token
-                ]
+                )
+            )
+
+            if asset_id is not None:
+                return asset_id
 
         canonical_ids = set(
             PREFERRED_ALIASES.values()

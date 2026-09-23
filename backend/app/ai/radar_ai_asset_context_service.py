@@ -1,5 +1,8 @@
 from typing import Optional
 
+from app.ai.asset_risk_assessment import (
+    calculate_asset_risk_assessment,
+)
 from app.ai.assistant_context import (
     AssistantContext,
     AssistantContextItem,
@@ -9,6 +12,12 @@ from app.ai.assistant_intent import (
 )
 from app.ai.crypto_asset_analysis_provider import (
     CryptoAssetAnalysisProvider,
+)
+from app.ai.crypto_asset_operational_range_provider import (
+    CryptoAssetOperationalRangeProvider,
+)
+from app.ai.radar_ai_asset_focus_resolver import (
+    RadarAIAssetFocusResolver,
 )
 from app.ai.radar_ai_asset_resolver import (
     RadarAIAssetResolver,
@@ -21,9 +30,6 @@ from app.services.asset_analysis_service import (
 )
 from app.services.market_data_service import (
     safe_float,
-)
-from app.ai.asset_risk_assessment import (
-    calculate_asset_risk_assessment,
 )
 
 
@@ -44,6 +50,12 @@ class RadarAIAssetContextService:
         asset_resolver: Optional[
             RadarAIAssetResolver
         ] = None,
+        operational_range_provider: Optional[
+            CryptoAssetOperationalRangeProvider
+        ] = None,
+        asset_focus_resolver: Optional[
+            RadarAIAssetFocusResolver
+        ] = None,
     ) -> None:
         self._provider = (
             provider
@@ -53,6 +65,16 @@ class RadarAIAssetContextService:
         self._asset_resolver = (
             asset_resolver
             or RadarAIAssetResolver()
+        )
+
+        self._operational_range_provider = (
+            operational_range_provider
+            or CryptoAssetOperationalRangeProvider()
+        )
+
+        self._asset_focus_resolver = (
+            asset_focus_resolver
+            or RadarAIAssetFocusResolver()
         )
 
     def build_context(
@@ -142,7 +164,7 @@ class RadarAIAssetContextService:
             )
         )
 
-        items = (
+        items = [
             AssistantContextItem(
                 key="asset_summary",
                 title="Resumo do ativo",
@@ -156,7 +178,8 @@ class RadarAIAssetContextService:
                 title="Preço",
                 content=(
                     f"{name} ({symbol}) está "
-                    f"cotado em US$ {price:,.8f}."
+                    f"cotado em US$ "
+                    f"{price:,.8f}."
                 ),
             ),
             AssistantContextItem(
@@ -241,12 +264,36 @@ class RadarAIAssetContextService:
                 title="Invalidação",
                 content=invalidation,
             ),
+        ]
+
+        focus = (
+            self._asset_focus_resolver.resolve(
+                question
+            )
         )
+
+        if focus in {
+            RadarAIAssetFocusResolver.OPERATIONAL_RANGE,
+            RadarAIAssetFocusResolver.RANGE_POSITION,
+            RadarAIAssetFocusResolver.RANGE_SPACE,
+        }:
+            range_assessment = (
+                self._operational_range_provider.fetch(
+                    asset_id=asset_id,
+                    current_price=price,
+                )
+            )
+
+            items.extend(
+                self._build_operational_range_items(
+                    name=name,
+                    assessment=range_assessment,
+                )
+            )
 
         return AssistantContext(
             intent=(
-                AssistantIntent
-                .ASSET_ANALYSIS
+                AssistantIntent.ASSET_ANALYSIS
             ),
             source=(
                 ASSET_ANALYSIS_SOURCE
@@ -254,5 +301,88 @@ class RadarAIAssetContextService:
             source_version=(
                 ASSET_ANALYSIS_VERSION
             ),
-            items=items,
+            items=tuple(items),
+        )
+
+    @staticmethod
+    def _build_operational_range_items(
+        *,
+        name: str,
+        assessment,
+    ) -> tuple[
+        AssistantContextItem,
+        ...,
+    ]:
+        if assessment is None:
+            return (
+                AssistantContextItem(
+                    key=(
+                        "asset_operational_range"
+                    ),
+                    title="Faixa operacional",
+                    content=(
+                        "Não há histórico "
+                        "suficiente para calcular "
+                        "a faixa operacional "
+                        f"recente de {name}."
+                    ),
+                ),
+            )
+
+        amplitude_status = (
+            "está dentro"
+            if (
+                assessment
+                .is_operational_amplitude
+            )
+            else "está fora"
+        )
+
+        return (
+            AssistantContextItem(
+                key=(
+                    "asset_operational_range"
+                ),
+                title="Faixa operacional",
+                content=(
+                    f"A faixa recente observada "
+                    f"de {name} vai de "
+                    f"US$ "
+                    f"{assessment.lower_limit:,.8f} "
+                    f"até US$ "
+                    f"{assessment.upper_limit:,.8f}. "
+                    f"A amplitude é de "
+                    f"{assessment.amplitude_percent:.2f}% "
+                    f"e {amplitude_status} da "
+                    f"faixa-alvo operacional "
+                    f"de 4% a 6%."
+                ),
+            ),
+            AssistantContextItem(
+                key=(
+                    "asset_operational_range_position"
+                ),
+                title="Posição na faixa",
+                content=(
+                    f"A posição relativa do preço "
+                    f"de {name} é "
+                    f"{assessment.position_percent:.2f}% "
+                    f"da amplitude observada "
+                    f"(0% = limite inferior; "
+                    f"100% = limite superior)."
+                ),
+            ),
+            AssistantContextItem(
+                key=(
+                    "asset_operational_range_space"
+                ),
+                title="Espaço na faixa",
+                content=(
+                    f"Distância do preço atual "
+                    f"ao limite inferior: "
+                    f"{assessment.distance_to_lower_percent:.2f}%. "
+                    f"Distância ao limite superior: "
+                    f"{assessment.distance_to_upper_percent:.2f}%."
+                ),
+            ),
         )

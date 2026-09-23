@@ -1,5 +1,8 @@
-from typing import Any, Optional
+from typing import Optional
 
+from app.ai.assistant_context import (
+    AssistantContext,
+)
 from app.ai.assistant_intent import (
     AssistantIntent,
 )
@@ -12,6 +15,19 @@ from app.ai.radar_ai_asset_focus_resolver import (
 
 
 class RadarAIAnswerComposer:
+    _UNSUPPORTED_MESSAGE = (
+        "Ainda não tenho contexto "
+        "suficiente para responder "
+        "essa pergunta."
+    )
+
+    _EMPTY_CONTEXT_MESSAGE = (
+        "Os dados foram processados, "
+        "mas não há informações "
+        "suficientes para montar "
+        "uma resposta."
+    )
+
     def __init__(
         self,
         *,
@@ -29,51 +45,43 @@ class RadarAIAnswerComposer:
 
         self._comparison_conclusion_composer = (
             comparison_conclusion_composer
-            or (
-                RadarAIAssetComparisonConclusionComposer()
-            )
+            or RadarAIAssetComparisonConclusionComposer()
         )
 
     def compose(
         self,
-        context: Any,
+        context: AssistantContext,
         question: Optional[str] = None,
     ) -> str:
         if not context.is_supported:
-            return (
-                "Ainda não tenho contexto "
-                "suficiente para responder "
-                "essa pergunta."
-            )
+            return self._UNSUPPORTED_MESSAGE
+
+        intent = getattr(
+            context,
+            "intent",
+            None,
+        )
 
         if (
-            question
-            and getattr(
-                context,
-                "intent",
-                None,
-            )
+            intent
             == AssistantIntent.ASSET_ANALYSIS
+            and question
         ):
             return self._compose_asset_answer(
-                context,
-                question,
+                context=context,
+                question=question,
             )
 
         if (
-            question
-            and getattr(
-                context,
-                "intent",
-                None,
-            )
+            intent
             == AssistantIntent.ASSET_COMPARISON
+            and question
         ):
             return (
                 self
                 ._compose_asset_comparison_answer(
-                    context,
-                    question,
+                    context=context,
+                    question=question,
                 )
             )
 
@@ -83,7 +91,7 @@ class RadarAIAnswerComposer:
 
     def __call__(
         self,
-        context: Any,
+        context: AssistantContext,
         question: Optional[str] = None,
     ) -> str:
         return self.compose(
@@ -93,7 +101,8 @@ class RadarAIAnswerComposer:
 
     def _compose_asset_answer(
         self,
-        context: Any,
+        *,
+        context: AssistantContext,
         question: str,
     ) -> str:
         focus = (
@@ -142,6 +151,28 @@ class RadarAIAnswerComposer:
             ),
             (
                 RadarAIAssetFocusResolver
+                .OPERATIONAL_RANGE
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_position",
+                "asset_operational_range_space",
+            ),
+            (
+                RadarAIAssetFocusResolver
+                .RANGE_POSITION
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_position",
+            ),
+            (
+                RadarAIAssetFocusResolver
+                .RANGE_SPACE
+            ): (
+                "asset_operational_range",
+                "asset_operational_range_space",
+            ),
+            (
+                RadarAIAssetFocusResolver
                 .PRICE
             ): (
                 "asset_price",
@@ -179,23 +210,20 @@ class RadarAIAnswerComposer:
         selected_keys = (
             keys_by_focus.get(
                 focus,
-                (),
+                keys_by_focus[
+                    RadarAIAssetFocusResolver
+                    .OVERVIEW
+                ],
             )
         )
 
-        selected_contents = [
-            item.content.strip()
-            for item in context.items
-            if (
-                item.key in selected_keys
-                and item.content.strip()
-            )
-        ]
+        answer = self._compose_selected_items(
+            context=context,
+            keys=selected_keys,
+        )
 
-        if selected_contents:
-            return "\n\n".join(
-                selected_contents
-            )
+        if answer:
+            return answer
 
         return self._compose_all_items(
             context
@@ -203,7 +231,8 @@ class RadarAIAnswerComposer:
 
     def _compose_asset_comparison_answer(
         self,
-        context: Any,
+        *,
+        context: AssistantContext,
         question: str,
     ) -> str:
         focus = (
@@ -287,61 +316,17 @@ class RadarAIAnswerComposer:
             ),
         }
 
-        selected_suffixes = (
+        suffixes = (
             suffixes_by_focus.get(
                 focus,
-                (),
+                suffixes_by_focus[
+                    RadarAIAssetFocusResolver
+                    .OVERVIEW
+                ],
             )
         )
 
-        items_by_key = {
-            item.key: item.content.strip()
-            for item in context.items
-            if item.content.strip()
-        }
-
-        asset_blocks = []
-
-        for position in (1, 2):
-            prefix = (
-                f"comparison_asset_{position}"
-            )
-
-            identity = items_by_key.get(
-                f"{prefix}_identity",
-                f"Ativo {position}",
-            )
-
-            contents = []
-
-            for suffix in selected_suffixes:
-                content = items_by_key.get(
-                    f"{prefix}_{suffix}"
-                )
-
-                if content:
-                    contents.append(
-                        content
-                    )
-
-            if contents:
-                asset_blocks.append(
-                    "\n".join(
-                        (
-                            identity,
-                            *contents,
-                        )
-                    )
-                )
-
-        if not asset_blocks:
-            return self._compose_all_items(
-                context
-            )
-
-        comparison_body = "\n\n".join(
-            asset_blocks
-        )
+        sections = []
 
         conclusion = (
             self
@@ -354,16 +339,119 @@ class RadarAIAnswerComposer:
         )
 
         if conclusion:
-            return (
-                f"{conclusion}\n\n"
-                f"{comparison_body}"
+            sections.append(
+                conclusion
             )
 
-        return comparison_body
+        for position in (
+            1,
+            2,
+        ):
+            prefix = (
+                f"comparison_asset_{position}"
+            )
+
+            identity = (
+                self._content_for_key(
+                    context,
+                    f"{prefix}_identity",
+                )
+            )
+
+            contents = []
+
+            for suffix in suffixes:
+                content = (
+                    self._content_for_key(
+                        context,
+                        f"{prefix}_{suffix}",
+                    )
+                )
+
+                if content:
+                    contents.append(
+                        content
+                    )
+
+            if not contents:
+                continue
+
+            if identity:
+                block = "\n".join(
+                    (
+                        identity,
+                        *contents,
+                    )
+                )
+
+            else:
+                block = "\n".join(
+                    contents
+                )
+
+            sections.append(
+                block
+            )
+
+        if sections:
+            return "\n\n".join(
+                sections
+            )
+
+        return self._compose_all_items(
+            context
+        )
 
     @staticmethod
+    def _compose_selected_items(
+        *,
+        context: AssistantContext,
+        keys: tuple[str, ...],
+    ) -> str:
+        selected_contents = []
+
+        item_by_key = {
+            item.key: item.content.strip()
+            for item in context.items
+            if item.content.strip()
+        }
+
+        for key in keys:
+            content = item_by_key.get(
+                key
+            )
+
+            if content:
+                selected_contents.append(
+                    content
+                )
+
+        return "\n".join(
+            selected_contents
+        )
+
+    @staticmethod
+    def _content_for_key(
+        context: AssistantContext,
+        key: str,
+    ) -> Optional[str]:
+        for item in context.items:
+            if item.key != key:
+                continue
+
+            content = (
+                item.content.strip()
+            )
+
+            if content:
+                return content
+
+        return None
+
+    @classmethod
     def _compose_all_items(
-        context: Any,
+        cls,
+        context: AssistantContext,
     ) -> str:
         contents = [
             item.content.strip()
@@ -373,10 +461,7 @@ class RadarAIAnswerComposer:
 
         if not contents:
             return (
-                "Os dados foram processados, "
-                "mas não há informações "
-                "suficientes para montar "
-                "uma resposta."
+                cls._EMPTY_CONTEXT_MESSAGE
             )
 
         return "\n\n".join(

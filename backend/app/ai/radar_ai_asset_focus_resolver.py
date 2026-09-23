@@ -13,6 +13,10 @@ class RadarAIAssetFocusResolver:
     INVALIDATION = "invalidation"
     EXPLANATION = "explanation"
 
+    OPERATIONAL_RANGE = "operational_range"
+    RANGE_POSITION = "range_position"
+    RANGE_SPACE = "range_space"
+
     _EXPLANATION_TERMS = (
         "por que",
         "porque",
@@ -56,6 +60,41 @@ class RadarAIAssetFocusResolver:
         "valor de mercado",
     )
 
+    _INVALIDATION_TERMS = (
+        "invalidacao",
+        "invalida",
+        "invalidar",
+    )
+
+    _RANGE_POSITION_TERMS = (
+        "onde esta",
+        "posicao na faixa",
+        "posicao dentro",
+        "dentro da faixa",
+        "regiao da faixa",
+        "parte da faixa",
+    )
+
+    _RANGE_SPACE_TERMS = (
+        "quanto espaco",
+        "espaco ate",
+        "distancia ate",
+        "distancia do limite",
+        "ate a resistencia",
+        "ate o suporte",
+        "limite superior",
+        "limite inferior",
+    )
+
+    _OPERATIONAL_RANGE_TERMS = (
+        "faixa operacional",
+        "amplitude operacional",
+        "amplitude da faixa",
+        "faixa recente",
+        "intervalo operacional",
+        "faixa",
+    )
+
     _PRICE_TERMS = (
         "preco",
         "price",
@@ -78,12 +117,6 @@ class RadarAIAssetFocusResolver:
     _VOLUME_TERMS = (
         "volume",
         "liquidez",
-    )
-
-    _INVALIDATION_TERMS = (
-        "invalidacao",
-        "invalida",
-        "invalidar",
     )
 
     def resolve(
@@ -123,14 +156,35 @@ class RadarAIAssetFocusResolver:
         ):
             return self.RISK
 
-        # Capitalização vem antes de preço
-        # para que "valor de mercado" não
-        # seja interpretado como preço.
         if self._contains_any(
             normalized,
             self._MARKET_CAP_TERMS,
         ):
             return self.MARKET_CAP
+
+        if self._contains_any(
+            normalized,
+            self._INVALIDATION_TERMS,
+        ):
+            return self.INVALIDATION
+
+        if self._contains_any(
+            normalized,
+            self._RANGE_POSITION_TERMS,
+        ):
+            return self.RANGE_POSITION
+
+        if self._contains_any(
+            normalized,
+            self._RANGE_SPACE_TERMS,
+        ):
+            return self.RANGE_SPACE
+
+        if self._contains_any(
+            normalized,
+            self._OPERATIONAL_RANGE_TERMS,
+        ):
+            return self.OPERATIONAL_RANGE
 
         if self._contains_any(
             normalized,
@@ -149,12 +203,6 @@ class RadarAIAssetFocusResolver:
             self._VOLUME_TERMS,
         ):
             return self.VOLUME
-
-        if self._contains_any(
-            normalized,
-            self._INVALIDATION_TERMS,
-        ):
-            return self.INVALIDATION
 
         return self.OVERVIEW
 
