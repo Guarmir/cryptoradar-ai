@@ -4,6 +4,10 @@ from app.ai.asset_operational_range_assessment import (
     AssetOperationalRangeAssessment,
     calculate_asset_operational_range,
 )
+from app.ai.asset_operational_range_recurrence_assessment import (
+    AssetOperationalRangeRecurrenceAssessment,
+    calculate_asset_operational_range_recurrence,
+)
 from app.services.market_data_service import (
     get_chart_data,
 )
@@ -38,6 +42,58 @@ class CryptoAssetOperationalRangeProvider:
     ) -> Optional[
         AssetOperationalRangeAssessment
     ]:
+        prices = self._load_prices(
+            asset_id
+        )
+
+        if prices is None:
+            return None
+
+        return (
+            calculate_asset_operational_range(
+                current_price=current_price,
+                prices=prices,
+            )
+        )
+
+    def fetch_recurrence(
+        self,
+        *,
+        asset_id: str,
+        current_price: float,
+    ) -> Optional[
+        AssetOperationalRangeRecurrenceAssessment
+    ]:
+        prices = self._load_prices(
+            asset_id
+        )
+
+        if prices is None:
+            return None
+
+        range_assessment = (
+            calculate_asset_operational_range(
+                current_price=current_price,
+                prices=prices,
+            )
+        )
+
+        if range_assessment is None:
+            return None
+
+        return (
+            calculate_asset_operational_range_recurrence(
+                prices=prices,
+                range_assessment=(
+                    range_assessment
+                ),
+            )
+        )
+
+    def _load_prices(
+        self,
+        asset_id: str,
+    ) -> Optional[tuple[float, ...]]:
         normalized_asset_id = (
             asset_id.strip().lower()
         )
@@ -74,10 +130,8 @@ class CryptoAssetOperationalRangeProvider:
         prices = []
 
         for point in raw_prices:
-            price = (
-                self._extract_price(
-                    point
-                )
+            price = self._extract_price(
+                point
             )
 
             if price is not None:
@@ -85,11 +139,8 @@ class CryptoAssetOperationalRangeProvider:
                     price
                 )
 
-        return (
-            calculate_asset_operational_range(
-                current_price=current_price,
-                prices=prices,
-            )
+        return tuple(
+            prices
         )
 
     @staticmethod
@@ -99,12 +150,21 @@ class CryptoAssetOperationalRangeProvider:
         candidate = None
 
         if (
-            isinstance(point, (list, tuple))
+            isinstance(
+                point,
+                (
+                    list,
+                    tuple,
+                ),
+            )
             and len(point) >= 2
         ):
             candidate = point[1]
 
-        elif isinstance(point, dict):
+        elif isinstance(
+            point,
+            dict,
+        ):
             candidate = (
                 point.get("price")
                 or point.get("value")
@@ -114,7 +174,9 @@ class CryptoAssetOperationalRangeProvider:
             return None
 
         try:
-            return float(candidate)
+            return float(
+                candidate
+            )
 
         except (
             TypeError,

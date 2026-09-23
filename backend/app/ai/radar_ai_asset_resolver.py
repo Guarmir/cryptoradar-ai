@@ -68,6 +68,7 @@ class RadarAIAssetResolver:
         "oportunidade",
         "oportunidades",
         "os",
+        "oscilacao",
         "ou",
         "panorama",
         "para",
@@ -76,6 +77,8 @@ class RadarAIAssetResolver:
         "qual",
         "quais",
         "recente",
+        "recorrencia",
+        "recorrente",
         "resistencia",
         "risco",
         "riscos",
@@ -87,6 +90,9 @@ class RadarAIAssetResolver:
         "suporte",
         "superior",
         "tendencia",
+        "tem",
+        "toque",
+        "toques",
         "um",
         "uma",
         "valor",
@@ -124,6 +130,10 @@ class RadarAIAssetResolver:
         "resistencia",
         "suporte",
         "limite",
+        "recorrencia",
+        "recorrente",
+        "oscilacao",
+        "toques",
     )
 
     def __init__(
@@ -200,7 +210,8 @@ class RadarAIAssetResolver:
             token
             for token in tokens
             if (
-                token not in self._STOPWORDS
+                token
+                not in self._STOPWORDS
                 and len(token) >= 2
             )
         ]

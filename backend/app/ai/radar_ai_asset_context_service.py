@@ -284,10 +284,39 @@ class RadarAIAssetContextService:
                 )
             )
 
+            recurrence_assessment = None
+
+            if (
+                range_assessment is not None
+                and focus
+                == RadarAIAssetFocusResolver
+                .OPERATIONAL_RANGE
+            ):
+                fetch_recurrence = getattr(
+                    self._operational_range_provider,
+                    "fetch_recurrence",
+                    None,
+                )
+
+                if callable(
+                    fetch_recurrence
+                ):
+                    recurrence_assessment = (
+                        fetch_recurrence(
+                            asset_id=asset_id,
+                            current_price=price,
+                        )
+                    )
+
             items.extend(
                 self._build_operational_range_items(
                     name=name,
-                    assessment=range_assessment,
+                    assessment=(
+                        range_assessment
+                    ),
+                    recurrence_assessment=(
+                        recurrence_assessment
+                    ),
                 )
             )
 
@@ -309,6 +338,7 @@ class RadarAIAssetContextService:
         *,
         name: str,
         assessment,
+        recurrence_assessment=None,
     ) -> tuple[
         AssistantContextItem,
         ...,
@@ -338,25 +368,33 @@ class RadarAIAssetContextService:
             else "está fora"
         )
 
+        range_content = (
+            f"A faixa recente observada "
+            f"de {name} vai de "
+            f"US$ "
+            f"{assessment.lower_limit:,.8f} "
+            f"até US$ "
+            f"{assessment.upper_limit:,.8f}. "
+            f"A amplitude é de "
+            f"{assessment.amplitude_percent:.2f}% "
+            f"e {amplitude_status} da "
+            f"faixa-alvo operacional "
+            f"de 4% a 6%."
+        )
+
+        if recurrence_assessment is not None:
+            range_content = (
+                f"{range_content} "
+                f"{RadarAIAssetContextService._build_recurrence_text(recurrence_assessment)}"
+            )
+
         return (
             AssistantContextItem(
                 key=(
                     "asset_operational_range"
                 ),
                 title="Faixa operacional",
-                content=(
-                    f"A faixa recente observada "
-                    f"de {name} vai de "
-                    f"US$ "
-                    f"{assessment.lower_limit:,.8f} "
-                    f"até US$ "
-                    f"{assessment.upper_limit:,.8f}. "
-                    f"A amplitude é de "
-                    f"{assessment.amplitude_percent:.2f}% "
-                    f"e {amplitude_status} da "
-                    f"faixa-alvo operacional "
-                    f"de 4% a 6%."
-                ),
+                content=range_content,
             ),
             AssistantContextItem(
                 key=(
@@ -385,4 +423,53 @@ class RadarAIAssetContextService:
                     f"{assessment.distance_to_upper_percent:.2f}%."
                 ),
             ),
+        )
+
+    @staticmethod
+    def _build_recurrence_text(
+        assessment,
+    ) -> str:
+        details = (
+            f"Foram identificados "
+            f"{assessment.lower_limit_touches} "
+            f"toques no limite inferior e "
+            f"{assessment.upper_limit_touches} "
+            f"toques no limite superior, "
+            f"com "
+            f"{assessment.completed_oscillations} "
+            f"oscilações completas estimadas."
+        )
+
+        if (
+            assessment
+            .suggests_organized_oscillation
+        ):
+            return (
+                f"{details} "
+                f"A recorrência é forte e "
+                f"equilibrada, sugerindo "
+                f"oscilação organizada "
+                f"dentro da faixa observada."
+            )
+
+        if (
+            assessment
+            .suggests_recurring_range
+        ):
+            return (
+                f"{details} "
+                f"A faixa apresenta "
+                f"recorrência mínima "
+                f"confirmada, mas o histórico "
+                f"ainda não é forte o "
+                f"suficiente para classificá-la "
+                f"como oscilação organizada."
+            )
+
+        return (
+            f"{details} "
+            f"A recorrência observada ainda "
+            f"é insuficiente para confirmar "
+            f"comportamento repetitivo "
+            f"entre os dois limites."
         )

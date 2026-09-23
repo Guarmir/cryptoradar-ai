@@ -92,6 +92,12 @@ class RadarAIAssetFocusResolver:
         "amplitude da faixa",
         "faixa recente",
         "intervalo operacional",
+        "recorrencia",
+        "recorrente",
+        "oscilacao organizada",
+        "oscilacao recorrente",
+        "toques na faixa",
+        "toques nos limites",
         "faixa",
     )
 
@@ -231,9 +237,11 @@ class RadarAIAssetFocusResolver:
     def _normalize(
         value: str,
     ) -> str:
-        normalized = unicodedata.normalize(
-            "NFKD",
-            value.strip().lower(),
+        normalized = (
+            unicodedata.normalize(
+                "NFKD",
+                value.strip().lower(),
+            )
         )
 
         return "".join(
