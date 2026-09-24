@@ -123,6 +123,9 @@ class RadarAIAnswerComposer:
                 "asset_signal",
                 "asset_market_context",
                 "asset_relative_strength",
+                "asset_operational_scenario",
+                "asset_operational_scenario_support",
+                "asset_operational_scenario_warnings",
             ),
             (
                 RadarAIAssetFocusResolver
@@ -138,6 +141,9 @@ class RadarAIAnswerComposer:
                 "asset_market_context",
                 "asset_market_btc",
                 "asset_relative_strength",
+                "asset_operational_scenario",
+                "asset_operational_scenario_support",
+                "asset_operational_scenario_warnings",
             ),
             (
                 RadarAIAssetFocusResolver
@@ -146,6 +152,8 @@ class RadarAIAnswerComposer:
                 "asset_risk_score",
                 "asset_risk_factors",
                 "asset_market_context",
+                "asset_operational_scenario",
+                "asset_operational_scenario_warnings",
                 "asset_risks",
                 "asset_invalidation",
             ),
@@ -204,6 +212,9 @@ class RadarAIAnswerComposer:
                 "asset_market_btc",
                 "asset_market_breadth",
                 "asset_relative_strength",
+                "asset_operational_scenario",
+                "asset_operational_scenario_support",
+                "asset_operational_scenario_warnings",
                 "asset_risks",
                 "asset_invalidation",
             ),
@@ -244,6 +255,7 @@ class RadarAIAnswerComposer:
                 "asset_operational_range_context",
                 "asset_market_context",
                 "asset_relative_strength",
+                "asset_operational_scenario",
             ),
         }
 

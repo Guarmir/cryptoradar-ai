@@ -5,6 +5,15 @@ from app.ai.asset_operational_range_intelligence_assessment import (
     calculate_asset_operational_range_invalidation,
     calculate_asset_operational_range_quality,
 )
+from app.ai.asset_market_context_assessment import (
+    calculate_asset_market_context,
+)
+from app.ai.asset_operational_scenario_assessment import (
+    calculate_asset_operational_scenario,
+)
+from app.ai.asset_operational_scenario_items_builder import (
+    build_asset_operational_scenario_items,
+)
 from app.ai.asset_market_context_items_builder import (
     build_asset_market_context_items,
     build_asset_market_context_unavailable_item,
@@ -291,6 +300,10 @@ class RadarAIAssetContextService:
             )
         )
 
+        market_context_assessment = None
+        quality_assessment = None
+        invalidation_assessment = None
+
         market_context_focuses = {
             RadarAIAssetFocusResolver.OVERVIEW,
             RadarAIAssetFocusResolver.SIGNAL,
@@ -324,13 +337,22 @@ class RadarAIAssetContextService:
                         )
                     )
                 else:
+                    market_context_assessment = (
+                        calculate_asset_market_context(
+                            asset_change_24h_percent=(
+                                change_24h
+                            ),
+                            snapshot=market_overview,
+                        )
+                    )
+
                     market_context_items = (
                         build_asset_market_context_items(
                             name=name,
                             asset_change_24h_percent=(
                                 change_24h
-                        ),
-                        snapshot=market_overview,
+                            ),
+                            snapshot=market_overview,
                         )
                     )
 
@@ -339,8 +361,8 @@ class RadarAIAssetContextService:
                             item
                             for item in market_context_items
                             if (
-                               item.key
-                               != "asset_relative_strength"
+                                item.key
+                                != "asset_relative_strength"
                             )
                         )
 
@@ -483,6 +505,55 @@ class RadarAIAssetContextService:
                     ),
                     consolidated_context=(
                         consolidated_context
+                    ),
+                )
+            )
+
+        if (
+            focus in market_context_focuses
+            and market_context_assessment
+            is not None
+        ):
+            operational_scenario = (
+                calculate_asset_operational_scenario(
+                    score=score,
+                    change_24h_percent=(
+                        change_24h
+                    ),
+                    risk_score=(
+                        risk_assessment.score
+                    ),
+                    range_quality_state=(
+                        quality_assessment.state
+                        if quality_assessment
+                        is not None
+                        else None
+                    ),
+                    range_invalidation_state=(
+                        invalidation_assessment.state
+                        if invalidation_assessment
+                        is not None
+                        else None
+                    ),
+                    market_context_state=(
+                        market_context_assessment.state
+                    ),
+                    relative_strength_state=(
+                        None
+                        if symbol == "BTC"
+                        else (
+                            market_context_assessment
+                            .relative_strength_state
+                        )
+                    ),
+                )
+            )
+
+            items.extend(
+                build_asset_operational_scenario_items(
+                    name=name,
+                    assessment=(
+                        operational_scenario
                     ),
                 )
             )
