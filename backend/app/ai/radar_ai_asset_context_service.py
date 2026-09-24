@@ -5,6 +5,10 @@ from app.ai.asset_operational_range_intelligence_assessment import (
     calculate_asset_operational_range_invalidation,
     calculate_asset_operational_range_quality,
 )
+from app.ai.asset_market_context_items_builder import (
+    build_asset_market_context_items,
+    build_asset_market_context_unavailable_item,
+)
 from app.ai.asset_risk_assessment import (
     calculate_asset_risk_assessment,
 )
@@ -20,6 +24,9 @@ from app.ai.crypto_asset_analysis_provider import (
 )
 from app.ai.crypto_asset_operational_range_provider import (
     CryptoAssetOperationalRangeProvider,
+)
+from app.ai.market_overview_provider import (
+    MarketOverviewProvider,
 )
 from app.ai.radar_ai_asset_focus_resolver import (
     RadarAIAssetFocusResolver,
@@ -61,6 +68,9 @@ class RadarAIAssetContextService:
         asset_focus_resolver: Optional[
             RadarAIAssetFocusResolver
         ] = None,
+        market_overview_provider: Optional[
+            MarketOverviewProvider
+        ] = None,
     ) -> None:
         self._provider = (
             provider
@@ -80,6 +90,10 @@ class RadarAIAssetContextService:
         self._asset_focus_resolver = (
             asset_focus_resolver
             or RadarAIAssetFocusResolver()
+        )
+
+        self._market_overview_provider = (
+            market_overview_provider
         )
 
     def build_context(
@@ -276,6 +290,63 @@ class RadarAIAssetContextService:
                 question
             )
         )
+
+        market_context_focuses = {
+            RadarAIAssetFocusResolver.OVERVIEW,
+            RadarAIAssetFocusResolver.SIGNAL,
+            RadarAIAssetFocusResolver.RISK,
+            RadarAIAssetFocusResolver.EXPLANATION,
+            RadarAIAssetFocusResolver.RANGE_CONTEXT,
+        }
+
+        if (
+            self._market_overview_provider
+            is not None
+            and focus in market_context_focuses
+        ):
+            fetch_market_overview = getattr(
+                self._market_overview_provider,
+                "fetch",
+                None,
+            )
+
+            if callable(
+                fetch_market_overview
+            ):
+                try:
+                   market_overview = (
+                       fetch_market_overview()
+                    )
+                except RuntimeError:
+                    items.append(
+                        build_asset_market_context_unavailable_item(
+                            name=name,
+                        )
+                    )
+                else:
+                    market_context_items = (
+                        build_asset_market_context_items(
+                            name=name,
+                            asset_change_24h_percent=(
+                                change_24h
+                        ),
+                        snapshot=market_overview,
+                        )
+                    )
+
+                    if symbol == "BTC":
+                        market_context_items = tuple(
+                            item
+                            for item in market_context_items
+                            if (
+                               item.key
+                               != "asset_relative_strength"
+                            )
+                        )
+
+                    items.extend(
+                        market_context_items
+                    )
 
         range_focuses = {
             RadarAIAssetFocusResolver.OPERATIONAL_RANGE,

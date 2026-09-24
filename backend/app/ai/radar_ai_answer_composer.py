@@ -121,6 +121,8 @@ class RadarAIAnswerComposer:
                 "asset_change",
                 "asset_score",
                 "asset_signal",
+                "asset_market_context",
+                "asset_relative_strength",
             ),
             (
                 RadarAIAssetFocusResolver
@@ -133,6 +135,9 @@ class RadarAIAnswerComposer:
                 .SIGNAL
             ): (
                 "asset_signal",
+                "asset_market_context",
+                "asset_market_btc",
+                "asset_relative_strength",
             ),
             (
                 RadarAIAssetFocusResolver
@@ -140,6 +145,7 @@ class RadarAIAnswerComposer:
             ): (
                 "asset_risk_score",
                 "asset_risk_factors",
+                "asset_market_context",
                 "asset_risks",
                 "asset_invalidation",
             ),
@@ -148,14 +154,6 @@ class RadarAIAnswerComposer:
                 .MARKET_CAP
             ): (
                 "asset_market_cap",
-            ),
-            (
-                RadarAIAssetFocusResolver
-                .OPERATIONAL_RANGE
-            ): (
-                "asset_operational_range",
-                "asset_operational_range_position",
-                "asset_operational_range_space",
             ),
             (
                 RadarAIAssetFocusResolver
@@ -202,6 +200,10 @@ class RadarAIAnswerComposer:
                 "asset_score",
                 "asset_signal",
                 "asset_reasons",
+                "asset_market_context",
+                "asset_market_btc",
+                "asset_market_breadth",
+                "asset_relative_strength",
                 "asset_risks",
                 "asset_invalidation",
             ),
@@ -240,6 +242,8 @@ class RadarAIAnswerComposer:
                 "asset_operational_range_quality",
                 "asset_operational_range_invalidation",
                 "asset_operational_range_context",
+                "asset_market_context",
+                "asset_relative_strength",
             ),
         }
 

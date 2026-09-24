@@ -105,6 +105,9 @@ class RadarAICryptoV1ApplicationFactory:
                     asset_resolver=(
                         effective_asset_resolver
                     ),
+                    market_overview_provider=(
+                        crypto_market_overview_provider
+                    ),
                 )
             )
 
