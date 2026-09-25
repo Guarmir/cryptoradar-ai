@@ -4,7 +4,9 @@ from typing import Any, Callable, Optional
 class RadarAICryptoContextBuilder:
     MARKET_OVERVIEW = "market_overview"
     ASSET_ANALYSIS = "asset_analysis"
-    ASSET_COMPARISON = "asset_comparison"
+    ASSET_COMPARISON = (
+        "asset_comparison"
+    )
 
     CRYPTO = "crypto"
 
@@ -35,6 +37,7 @@ class RadarAICryptoContextBuilder:
         intent: str,
         market: str,
         provider: Any,
+        asset_id: Optional[str] = None,
     ) -> Any:
         if market != self.CRYPTO:
             raise ValueError(
@@ -51,11 +54,21 @@ class RadarAICryptoContextBuilder:
             )
 
         if intent == self.ASSET_ANALYSIS:
+            if asset_id is None:
+                return (
+                    self
+                    ._build_asset_analysis_context(
+                        question,
+                        provider,
+                    )
+                )
+
             return (
                 self
                 ._build_asset_analysis_context(
                     question,
                     provider,
+                    asset_id,
                 )
             )
 

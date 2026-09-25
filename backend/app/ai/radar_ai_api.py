@@ -30,6 +30,12 @@ class RadarAIQuestionRequest(
         max_length=2000,
     )
 
+    asset_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+    )
+
 
 class RadarAIContextItemResponse(
     BaseModel
@@ -93,12 +99,23 @@ def ask_radar_ai(
     )
 
     try:
-        result = (
-            effective_orchestrator
-            .orchestrate(
-                request.question,
+        if request.asset_id is None:
+            result = (
+                effective_orchestrator
+                .orchestrate(
+                    request.question,
+                )
             )
-        )
+        else:
+            result = (
+                effective_orchestrator
+                .orchestrate(
+                    request.question,
+                    asset_id=(
+                        request.asset_id
+                    ),
+                )
+            )
 
     except ValueError as error:
         raise HTTPException(

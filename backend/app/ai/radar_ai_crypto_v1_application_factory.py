@@ -18,6 +18,9 @@ from app.ai.radar_ai_asset_resolver import (
 from app.ai.radar_ai_crypto_context_builder import (
     RadarAICryptoContextBuilder,
 )
+from app.ai.radar_ai_explicit_asset_resolver import (
+    RadarAIExplicitAssetResolver,
+)
 from app.ai.radar_ai_intent_resolver import (
     RadarAIIntentResolver,
 )
@@ -98,12 +101,24 @@ class RadarAICryptoV1ApplicationFactory:
         def build_asset_analysis_context(
             question: str,
             provider: Any,
+            asset_id: Optional[str] = None,
         ):
+            request_asset_resolver = (
+                effective_asset_resolver
+            )
+
+            if asset_id is not None:
+                request_asset_resolver = (
+                    RadarAIExplicitAssetResolver(
+                        asset_id
+                    )
+                )
+
             service = (
                 RadarAIAssetContextService(
                     provider=provider,
                     asset_resolver=(
-                        effective_asset_resolver
+                        request_asset_resolver
                     ),
                     market_overview_provider=(
                         crypto_market_overview_provider
@@ -149,8 +164,10 @@ class RadarAICryptoV1ApplicationFactory:
         def resolve_market(
             question: str,
         ) -> str:
-            market = market_resolver.resolve(
-                question
+            market = (
+                market_resolver.resolve(
+                    question
+                )
             )
 
             if (
@@ -166,6 +183,8 @@ class RadarAICryptoV1ApplicationFactory:
         return RadarAIOrchestrator(
             intent_resolver=intent_resolver,
             market_resolver=resolve_market,
-            provider_resolver=provider_resolver,
+            provider_resolver=(
+                provider_resolver
+            ),
             context_builder=context_builder,
         )
