@@ -22,6 +22,19 @@ from app.ai.radar_ai_orchestrator import (
 )
 
 
+_UNKNOWN_CRYPTO_ROUTE_ERROR = (
+    "unsupported Radar AI provider route: "
+    "intent=unknown, market=crypto"
+)
+
+_UNKNOWN_CRYPTO_ROUTE_MESSAGE = (
+    "Não foi possível identificar com segurança "
+    "o ativo ou o tipo de análise solicitado. "
+    "Se você informou apenas um símbolo, "
+    "use o nome completo do ativo."
+)
+
+
 class RadarAIQuestionRequest(
     BaseModel
 ):
@@ -58,6 +71,19 @@ class RadarAIQuestionResponse(
     items: list[
         RadarAIContextItemResponse
     ]
+
+
+def _value_error_detail(
+    error: ValueError,
+) -> str:
+    detail = str(error)
+
+    if detail == _UNKNOWN_CRYPTO_ROUTE_ERROR:
+        return (
+            _UNKNOWN_CRYPTO_ROUTE_MESSAGE
+        )
+
+    return detail
 
 
 def ask_radar_ai(
@@ -120,7 +146,9 @@ def ask_radar_ai(
     except ValueError as error:
         raise HTTPException(
             status_code=422,
-            detail=str(error),
+            detail=_value_error_detail(
+                error
+            ),
         ) from error
 
     except (

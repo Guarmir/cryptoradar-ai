@@ -188,6 +188,51 @@ def test_api_maps_invalid_request_to_422() -> None:
         == 422
     )
 
+    assert captured.value.detail == (
+        "unsupported Radar AI route"
+    )
+
+
+def test_api_maps_unknown_crypto_route_to_safe_message() -> None:
+    class FakeOrchestrator:
+        def orchestrate(
+            self,
+            question: str,
+        ):
+            raise ValueError(
+                "unsupported Radar AI provider route: "
+                "intent=unknown, market=crypto"
+            )
+
+    with pytest.raises(
+        HTTPException,
+    ) as captured:
+        ask_radar_ai(
+            RadarAIQuestionRequest(
+                question="Como está SI?",
+            ),
+            orchestrator=(
+                FakeOrchestrator()
+            ),
+        )
+
+    assert (
+        captured.value.status_code
+        == 422
+    )
+
+    assert captured.value.detail == (
+        "Não foi possível identificar com segurança "
+        "o ativo ou o tipo de análise solicitado. "
+        "Se você informou apenas um símbolo, "
+        "use o nome completo do ativo."
+    )
+
+    assert (
+        "unsupported Radar AI provider route"
+        not in captured.value.detail
+    )
+
 
 def test_api_maps_market_error_to_503() -> None:
     class FakeOrchestrator:
@@ -245,6 +290,8 @@ def test_api_maps_asset_error_to_503() -> None:
         captured.value.status_code
         == 503
     )
+
+
 def test_api_returns_focused_asset_answer() -> None:
     provider = object()
 
