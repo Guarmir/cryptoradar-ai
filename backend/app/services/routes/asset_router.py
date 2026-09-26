@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException
 from app.services.asset_analysis_service import (
     build_empty_asset_response,
     calculate_ai_score,
-    calculate_score_from_market,
     generate_ai_analysis,
     get_ai_confidence,
     get_ai_signal,
@@ -13,6 +12,14 @@ from app.services.market_data_service import (
     get_market_data,
     resolve_coin_id,
     safe_float,
+)
+from app.services.asset_analysis_service import (
+    build_empty_asset_response,
+    calculate_ai_score,
+    calculate_score_from_market,
+    generate_ai_analysis,
+    get_ai_confidence,
+    get_ai_signal,
 )
 
 
@@ -195,10 +202,28 @@ def create_asset_router() -> APIRouter:
                 ),
             }
 
-        score, signal = (
-            calculate_score_from_market(
-                market
+        market_cap = safe_float(
+            market.get("market_cap")
+        )
+
+        volume = safe_float(
+            market.get("total_volume")
+        )
+
+        change_24h = safe_float(
+            market.get(
+                "price_change_percentage_24h"
             )
+        )
+
+        score = calculate_ai_score(
+            change_24h,
+            volume,
+            market_cap,
+        )
+
+        signal = get_ai_signal(
+            score
         )
 
         return {
@@ -331,10 +356,28 @@ def create_asset_router() -> APIRouter:
                 ),
             }
 
-        score, signal = (
-            calculate_score_from_market(
-                market
+        market_cap = safe_float(
+            market.get("market_cap")
+        )
+
+        volume = safe_float(
+            market.get("total_volume")
+        )
+
+        change_24h = safe_float(
+            market.get(
+                "price_change_percentage_24h"
             )
+        )
+
+        score = calculate_ai_score(
+            change_24h,
+            volume,
+            market_cap,
+        )
+
+        signal = get_ai_signal(
+            score
         )
 
         prices = chart_data.get(
