@@ -126,6 +126,33 @@ def test_returns_none_when_dynamic_asset_is_not_found() -> None:
     ) is None
 
 
+def test_ambiguous_dynamic_symbol_is_not_resolved() -> None:
+    received = []
+
+    def ambiguous_coin_resolver(
+        candidate: str,
+    ):
+        received.append(candidate)
+
+        if candidate == "si":
+            return None
+
+        return None
+
+    resolver = RadarAIAssetResolver(
+        dynamic_coin_resolver=(
+            ambiguous_coin_resolver
+        ),
+    )
+
+    result = resolver.resolve(
+        "Como está SI?"
+    )
+
+    assert result is None
+    assert "si" in received
+
+
 def test_rejects_empty_question() -> None:
     resolver = RadarAIAssetResolver()
 

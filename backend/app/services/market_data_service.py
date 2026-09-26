@@ -147,10 +147,13 @@ def resolve_coin_id(
 
     coins = get_coin_list()
 
+    # Um ID canônico exato tem prioridade.
     for coin in coins:
         if coin["id"].lower() == query:
             return coin["id"]
 
+    # Um nome exato também identifica
+    # diretamente o ativo.
     for coin in coins:
         if coin["name"].lower() == query:
             return coin["id"]
@@ -161,34 +164,18 @@ def resolve_coin_id(
         if coin["symbol"].lower() == query
     ]
 
-    if exact_symbol_matches:
-        if len(exact_symbol_matches) == 1:
-            return exact_symbol_matches[0]["id"]
-
-        preferred_names = {
-            "btc": "bitcoin",
-            "eth": "ethereum",
-            "sol": "solana",
-            "xrp": "ripple",
-            "ada": "cardano",
-            "doge": "dogecoin",
-        }
-
-        preferred_name = (
-            preferred_names.get(query)
-        )
-
-        if preferred_name:
-            for coin in exact_symbol_matches:
-                if (
-                    coin["id"].lower()
-                    == preferred_name
-                    or coin["name"].lower()
-                    == preferred_name
-                ):
-                    return coin["id"]
-
+    # Símbolo só é considerado seguro quando
+    # identifica exatamente um ativo.
+    if len(exact_symbol_matches) == 1:
         return exact_symbol_matches[0]["id"]
+
+    # Dois ou mais ativos com o mesmo símbolo
+    # são considerados ambíguos.
+    #
+    # Não escolhemos silenciosamente o primeiro
+    # resultado retornado pela CoinGecko.
+    if len(exact_symbol_matches) > 1:
+        return None
 
     for coin in coins:
         if query in coin["id"].lower():
@@ -310,7 +297,9 @@ def get_chart_data(
         }
 
 
-def safe_float(value):
+def safe_float(
+    value,
+) -> float:
     try:
         if value is None:
             return 0.0

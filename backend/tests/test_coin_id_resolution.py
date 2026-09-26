@@ -108,6 +108,63 @@ class CoinIdResolutionTest(
             "example-coin",
         )
 
+    def test_unique_exact_symbol_resolution_is_preserved(
+        self,
+    ):
+        coins = [
+            {
+                "id": "example-coin",
+                "symbol": "exm",
+                "name": "Example Coin",
+            },
+            {
+                "id": "another-coin",
+                "symbol": "abc",
+                "name": "Another Coin",
+            },
+        ]
+
+        with patch(
+            "app.services.market_data_service.get_coin_list",
+            return_value=coins,
+        ):
+            result = resolve_coin_id(
+                "exm"
+            )
+
+        self.assertEqual(
+            result,
+            "example-coin",
+        )
+
+    def test_ambiguous_exact_symbol_is_not_selected_silently(
+        self,
+    ):
+        coins = [
+            {
+                "id": "siren",
+                "symbol": "si",
+                "name": "Siren",
+            },
+            {
+                "id": "second-si-asset",
+                "symbol": "si",
+                "name": "Second SI Asset",
+            },
+        ]
+
+        with patch(
+            "app.services.market_data_service.get_coin_list",
+            return_value=coins,
+        ):
+            result = resolve_coin_id(
+                "si"
+            )
+
+        self.assertIsNone(
+            result
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
