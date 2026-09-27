@@ -9,6 +9,12 @@ from app.early_movement.early_movement_breakout_confirmation_detector import (
 )
 from app.early_movement.early_movement_evaluator import EarlyMovementEvaluator
 from app.early_movement.early_movement_evidence import EarlyMovementEvidence
+from app.early_movement.early_movement_false_breakout_risk import (
+    EarlyMovementFalseBreakoutRisk,
+)
+from app.early_movement.early_movement_false_breakout_risk_evaluator import (
+    EarlyMovementFalseBreakoutRiskEvaluator,
+)
 from app.early_movement.early_movement_metric_extractor import (
     EarlyMovementMetricExtractor,
 )
@@ -26,6 +32,7 @@ class EarlyMovementAnalysis:
     metrics: EarlyMovementMetrics
     price_structure: EarlyMovementPriceStructure
     breakout_confirmation: EarlyMovementBreakoutConfirmation
+    false_breakout_risk: EarlyMovementFalseBreakoutRisk
     evidence: EarlyMovementEvidence
 
 
@@ -41,6 +48,9 @@ class EarlyMovementAnalyzer:
         ] = None,
         breakout_confirmation_detector: Optional[
             EarlyMovementBreakoutConfirmationDetector
+        ] = None,
+        false_breakout_risk_evaluator: Optional[
+            EarlyMovementFalseBreakoutRiskEvaluator
         ] = None,
         evaluator: Optional[
             EarlyMovementEvaluator
@@ -59,6 +69,11 @@ class EarlyMovementAnalyzer:
         self._breakout_confirmation_detector = (
             breakout_confirmation_detector
             or EarlyMovementBreakoutConfirmationDetector()
+        )
+
+        self._false_breakout_risk_evaluator = (
+            false_breakout_risk_evaluator
+            or EarlyMovementFalseBreakoutRiskEvaluator()
         )
 
         self._evaluator = (
@@ -128,6 +143,20 @@ class EarlyMovementAnalyzer:
             else retest_confirmed
         )
 
+        automatic_false_breakout_risk = (
+            self._false_breakout_risk_evaluator.evaluate(
+                metrics=metrics,
+                price_structure=price_structure,
+                breakout_confirmation=breakout_confirmation,
+            )
+        )
+
+        resolved_false_breakout_risk = (
+            automatic_false_breakout_risk.score
+            if false_breakout_risk is None
+            else false_breakout_risk
+        )
+
         evidence = self._evaluator.evaluate(
             price_acceleration=(
                 metrics.price_acceleration
@@ -152,7 +181,7 @@ class EarlyMovementAnalyzer:
                 metrics.persistence_score
             ),
             false_breakout_risk=(
-                false_breakout_risk
+                resolved_false_breakout_risk
             ),
         )
 
@@ -161,6 +190,9 @@ class EarlyMovementAnalyzer:
             price_structure=price_structure,
             breakout_confirmation=(
                 breakout_confirmation
+            ),
+            false_breakout_risk=(
+                automatic_false_breakout_risk
             ),
             evidence=evidence,
         )

@@ -50,11 +50,18 @@ def test_analyzer_detects_upward_breakout_automatically() -> None:
             ),
         },
         liquidity_score=75.0,
-        false_breakout_risk=20.0,
     )
 
     assert result.price_structure.resistance_break is True
     assert result.evidence.resistance_break is True
+
+    assert result.false_breakout_risk.applicable is True
+    assert result.false_breakout_risk.score is not None
+
+    assert (
+        result.evidence.false_breakout_risk
+        == result.false_breakout_risk.score
+    )
 
     assert (
         result.evidence.state
@@ -96,7 +103,6 @@ def test_analyzer_detects_downward_breakout_automatically() -> None:
             ),
         },
         liquidity_score=80.0,
-        false_breakout_risk=15.0,
     )
 
     assert result.price_structure.support_break is True
@@ -104,6 +110,14 @@ def test_analyzer_detects_downward_breakout_automatically() -> None:
 
     assert result.metrics.price_acceleration is not None
     assert result.metrics.price_acceleration < 0
+
+    assert result.false_breakout_risk.applicable is True
+    assert result.false_breakout_risk.score is not None
+
+    assert (
+        result.evidence.false_breakout_risk
+        == result.false_breakout_risk.score
+    )
 
     assert (
         result.evidence.state
@@ -145,10 +159,7 @@ def test_analyzer_uses_upward_retest_automatically() -> None:
         }
     )
 
-    assert (
-        result.price_structure.resistance_break
-        is False
-    )
+    assert result.price_structure.resistance_break is False
 
     assert (
         result.breakout_confirmation.retest_confirmed
@@ -162,6 +173,14 @@ def test_analyzer_uses_upward_retest_automatically() -> None:
 
     assert result.evidence.resistance_break is True
     assert result.evidence.retest_confirmed is True
+
+    assert result.false_breakout_risk.applicable is True
+    assert result.false_breakout_risk.score is not None
+
+    assert (
+        result.evidence.false_breakout_risk
+        == result.false_breakout_risk.score
+    )
 
 
 def test_analyzer_uses_downward_retest_automatically() -> None:
@@ -198,10 +217,7 @@ def test_analyzer_uses_downward_retest_automatically() -> None:
         }
     )
 
-    assert (
-        result.price_structure.support_break
-        is False
-    )
+    assert result.price_structure.support_break is False
 
     assert (
         result.breakout_confirmation.retest_confirmed
@@ -215,6 +231,95 @@ def test_analyzer_uses_downward_retest_automatically() -> None:
 
     assert result.evidence.support_break is True
     assert result.evidence.retest_confirmed is True
+
+    assert result.false_breakout_risk.applicable is True
+    assert result.false_breakout_risk.score is not None
+
+
+def test_analyzer_does_not_create_false_breakout_risk_without_breakout() -> None:
+    analyzer = EarlyMovementAnalyzer()
+
+    result = analyzer.analyze(
+        {
+            "prices": _series(
+                [
+                    100.0,
+                    100.4,
+                    100.8,
+                    101.0,
+                    100.7,
+                    100.5,
+                    100.9,
+                    100.6,
+                    100.8,
+                ]
+            ),
+            "total_volumes": _series(
+                [
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                ]
+            ),
+        }
+    )
+
+    assert result.price_structure.support_break is False
+    assert result.price_structure.resistance_break is False
+
+    assert result.false_breakout_risk.applicable is False
+    assert result.false_breakout_risk.score is None
+
+    assert result.evidence.false_breakout_risk is None
+
+
+def test_manual_false_breakout_risk_override_is_preserved() -> None:
+    analyzer = EarlyMovementAnalyzer()
+
+    result = analyzer.analyze(
+        {
+            "prices": _series(
+                [
+                    100.0,
+                    100.2,
+                    100.4,
+                    100.6,
+                    100.8,
+                    101.0,
+                    101.2,
+                    102.5,
+                    104.0,
+                    106.0,
+                ]
+            ),
+            "total_volumes": _series(
+                [
+                    100.0,
+                    100.0,
+                    110.0,
+                    90.0,
+                    100.0,
+                    100.0,
+                    180.0,
+                    220.0,
+                    200.0,
+                ]
+            ),
+        },
+        liquidity_score=75.0,
+        false_breakout_risk=12.0,
+    )
+
+    assert result.false_breakout_risk.applicable is True
+    assert result.false_breakout_risk.score is not None
+
+    assert result.evidence.false_breakout_risk == 12.0
 
 
 def test_manual_confirmation_override_is_preserved() -> None:
@@ -333,6 +438,9 @@ def test_analyzer_handles_insufficient_market_data_safely() -> None:
         result.breakout_confirmation.retest_confirmed
         is False
     )
+
+    assert result.false_breakout_risk.applicable is False
+    assert result.false_breakout_risk.score is None
 
     assert result.price_structure.support_level is None
     assert result.price_structure.resistance_level is None
