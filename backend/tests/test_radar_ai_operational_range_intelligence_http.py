@@ -7,11 +7,18 @@ from app.ai.asset_operational_range_assessment import (
 from app.ai.asset_operational_range_recurrence_assessment import (
     AssetOperationalRangeRecurrenceAssessment,
 )
+from app.ai.coingecko_market_overview_provider import (
+    CoinGeckoMarketOverviewProvider,
+)
 from app.ai.crypto_asset_analysis_provider import (
     CryptoAssetAnalysisProvider,
 )
 from app.ai.crypto_asset_operational_range_provider import (
     CryptoAssetOperationalRangeProvider,
+)
+from app.ai.market_overview_snapshot import (
+    MarketOverviewAsset,
+    MarketOverviewSnapshot,
 )
 from app.ai.radar_ai_asset_resolver import (
     RadarAIAssetResolver,
@@ -41,6 +48,44 @@ def _fake_market_fetch(
         "total_volume": 1_200_000_000,
         "price_change_percentage_24h": 2.5,
     }
+
+
+def _fake_market_overview_fetch(
+    self,
+):
+    return MarketOverviewSnapshot(
+        total_market_cap_usd=2_500_000_000_000,
+        total_volume_24h_usd=120_000_000_000,
+        market_cap_change_24h_percent=1.2,
+        btc_dominance_percent=55.0,
+        eth_dominance_percent=13.0,
+        assets=(
+            MarketOverviewAsset(
+                symbol="btc",
+                name="Bitcoin",
+                price_usd=65_000.0,
+                change_24h_percent=1.2,
+                market_cap_usd=1_200_000_000_000,
+                volume_24h_usd=30_000_000_000,
+            ),
+            MarketOverviewAsset(
+                symbol="eth",
+                name="Ethereum",
+                price_usd=3_500.0,
+                change_24h_percent=1.8,
+                market_cap_usd=420_000_000_000,
+                volume_24h_usd=18_000_000_000,
+            ),
+            MarketOverviewAsset(
+                symbol="uni",
+                name="Uniswap",
+                price_usd=102.5,
+                change_24h_percent=2.5,
+                market_cap_usd=10_000_000_000,
+                volume_24h_usd=1_200_000_000,
+            ),
+        ),
+    )
 
 
 def _fake_range_fetch(
@@ -154,6 +199,12 @@ def test_operational_range_intelligence_reaches_http(
         CryptoAssetAnalysisProvider,
         "fetch",
         _fake_market_fetch,
+    )
+
+    monkeypatch.setattr(
+        CoinGeckoMarketOverviewProvider,
+        "fetch",
+        _fake_market_overview_fetch,
     )
 
     monkeypatch.setattr(
