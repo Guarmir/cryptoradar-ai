@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
+from app.early_movement.early_movement_breakout_confirmation import (
+    EarlyMovementBreakoutConfirmation,
+)
+from app.early_movement.early_movement_breakout_confirmation_detector import (
+    EarlyMovementBreakoutConfirmationDetector,
+)
 from app.early_movement.early_movement_evaluator import EarlyMovementEvaluator
 from app.early_movement.early_movement_evidence import EarlyMovementEvidence
 from app.early_movement.early_movement_metric_extractor import (
@@ -19,6 +25,7 @@ from app.early_movement.early_movement_price_structure_detector import (
 class EarlyMovementAnalysis:
     metrics: EarlyMovementMetrics
     price_structure: EarlyMovementPriceStructure
+    breakout_confirmation: EarlyMovementBreakoutConfirmation
     evidence: EarlyMovementEvidence
 
 
@@ -31,6 +38,9 @@ class EarlyMovementAnalyzer:
         ] = None,
         price_structure_detector: Optional[
             EarlyMovementPriceStructureDetector
+        ] = None,
+        breakout_confirmation_detector: Optional[
+            EarlyMovementBreakoutConfirmationDetector
         ] = None,
         evaluator: Optional[
             EarlyMovementEvaluator
@@ -46,6 +56,11 @@ class EarlyMovementAnalyzer:
             or EarlyMovementPriceStructureDetector()
         )
 
+        self._breakout_confirmation_detector = (
+            breakout_confirmation_detector
+            or EarlyMovementBreakoutConfirmationDetector()
+        )
+
         self._evaluator = (
             evaluator
             or EarlyMovementEvaluator()
@@ -58,7 +73,7 @@ class EarlyMovementAnalyzer:
         liquidity_score: Optional[float] = None,
         support_break: Optional[bool] = None,
         resistance_break: Optional[bool] = None,
-        retest_confirmed: bool = False,
+        retest_confirmed: Optional[bool] = None,
         false_breakout_risk: Optional[float] = None,
     ) -> EarlyMovementAnalysis:
         metrics = self._metric_extractor.extract(
@@ -71,16 +86,46 @@ class EarlyMovementAnalyzer:
             )
         )
 
-        resolved_support_break = (
+        breakout_confirmation = (
+            self._breakout_confirmation_detector.detect(
+                chart_data,
+            )
+        )
+
+        automatic_support_break = (
             price_structure.support_break
+            or (
+                breakout_confirmation.retest_confirmed
+                and breakout_confirmation.breakout_direction
+                == "down"
+            )
+        )
+
+        automatic_resistance_break = (
+            price_structure.resistance_break
+            or (
+                breakout_confirmation.retest_confirmed
+                and breakout_confirmation.breakout_direction
+                == "up"
+            )
+        )
+
+        resolved_support_break = (
+            automatic_support_break
             if support_break is None
             else support_break
         )
 
         resolved_resistance_break = (
-            price_structure.resistance_break
+            automatic_resistance_break
             if resistance_break is None
             else resistance_break
+        )
+
+        resolved_retest_confirmed = (
+            breakout_confirmation.retest_confirmed
+            if retest_confirmed is None
+            else retest_confirmed
         )
 
         evidence = self._evaluator.evaluate(
@@ -100,7 +145,9 @@ class EarlyMovementAnalyzer:
             resistance_break=(
                 resolved_resistance_break
             ),
-            retest_confirmed=retest_confirmed,
+            retest_confirmed=(
+                resolved_retest_confirmed
+            ),
             persistence_score=(
                 metrics.persistence_score
             ),
@@ -112,5 +159,8 @@ class EarlyMovementAnalyzer:
         return EarlyMovementAnalysis(
             metrics=metrics,
             price_structure=price_structure,
+            breakout_confirmation=(
+                breakout_confirmation
+            ),
             evidence=evidence,
         )

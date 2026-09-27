@@ -53,20 +53,8 @@ def test_analyzer_detects_upward_breakout_automatically() -> None:
         false_breakout_risk=20.0,
     )
 
-    assert (
-        result.price_structure.resistance_break
-        is True
-    )
-
-    assert (
-        result.price_structure.support_break
-        is False
-    )
-
-    assert (
-        result.evidence.resistance_break
-        is True
-    )
+    assert result.price_structure.resistance_break is True
+    assert result.evidence.resistance_break is True
 
     assert (
         result.evidence.state
@@ -111,20 +99,8 @@ def test_analyzer_detects_downward_breakout_automatically() -> None:
         false_breakout_risk=15.0,
     )
 
-    assert (
-        result.price_structure.support_break
-        is True
-    )
-
-    assert (
-        result.price_structure.resistance_break
-        is False
-    )
-
-    assert (
-        result.evidence.support_break
-        is True
-    )
+    assert result.price_structure.support_break is True
+    assert result.evidence.support_break is True
 
     assert result.metrics.price_acceleration is not None
     assert result.metrics.price_acceleration < 0
@@ -133,6 +109,157 @@ def test_analyzer_detects_downward_breakout_automatically() -> None:
         result.evidence.state
         is EarlyMovementState.EARLY_MOVEMENT
     )
+
+
+def test_analyzer_uses_upward_retest_automatically() -> None:
+    analyzer = EarlyMovementAnalyzer()
+
+    result = analyzer.analyze(
+        {
+            "prices": _series(
+                [
+                    100.0,
+                    100.5,
+                    101.0,
+                    101.2,
+                    101.5,
+                    102.0,
+                    103.0,
+                    102.2,
+                    103.2,
+                ]
+            ),
+            "total_volumes": _series(
+                [
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    140.0,
+                    130.0,
+                    150.0,
+                ]
+            ),
+        }
+    )
+
+    assert (
+        result.price_structure.resistance_break
+        is False
+    )
+
+    assert (
+        result.breakout_confirmation.retest_confirmed
+        is True
+    )
+
+    assert (
+        result.breakout_confirmation.breakout_direction
+        == "up"
+    )
+
+    assert result.evidence.resistance_break is True
+    assert result.evidence.retest_confirmed is True
+
+
+def test_analyzer_uses_downward_retest_automatically() -> None:
+    analyzer = EarlyMovementAnalyzer()
+
+    result = analyzer.analyze(
+        {
+            "prices": _series(
+                [
+                    100.0,
+                    99.8,
+                    99.5,
+                    99.2,
+                    99.0,
+                    98.8,
+                    97.8,
+                    98.6,
+                    97.6,
+                ]
+            ),
+            "total_volumes": _series(
+                [
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    140.0,
+                    130.0,
+                    150.0,
+                ]
+            ),
+        }
+    )
+
+    assert (
+        result.price_structure.support_break
+        is False
+    )
+
+    assert (
+        result.breakout_confirmation.retest_confirmed
+        is True
+    )
+
+    assert (
+        result.breakout_confirmation.breakout_direction
+        == "down"
+    )
+
+    assert result.evidence.support_break is True
+    assert result.evidence.retest_confirmed is True
+
+
+def test_manual_confirmation_override_is_preserved() -> None:
+    analyzer = EarlyMovementAnalyzer()
+
+    result = analyzer.analyze(
+        {
+            "prices": _series(
+                [
+                    100.0,
+                    100.5,
+                    101.0,
+                    101.2,
+                    101.5,
+                    102.0,
+                    103.0,
+                    102.2,
+                    103.2,
+                ]
+            ),
+            "total_volumes": _series(
+                [
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    140.0,
+                    130.0,
+                    150.0,
+                ]
+            ),
+        },
+        resistance_break=False,
+        retest_confirmed=False,
+    )
+
+    assert (
+        result.breakout_confirmation.retest_confirmed
+        is True
+    )
+
+    assert result.evidence.resistance_break is False
+    assert result.evidence.retest_confirmed is False
 
 
 def test_analyzer_does_not_fake_missing_context() -> None:
@@ -170,63 +297,11 @@ def test_analyzer_does_not_fake_missing_context() -> None:
         }
     )
 
-    assert (
-        result.price_structure.resistance_break
-        is True
-    )
-
     assert result.evidence.liquidity_score is None
 
     assert (
         result.evidence.state
         is EarlyMovementState.OBSERVATION
-    )
-
-
-def test_manual_breakout_override_is_preserved() -> None:
-    analyzer = EarlyMovementAnalyzer()
-
-    result = analyzer.analyze(
-        {
-            "prices": _series(
-                [
-                    100.0,
-                    100.1,
-                    100.2,
-                    100.3,
-                    100.4,
-                    100.5,
-                    100.6,
-                    100.7,
-                    100.8,
-                    100.9,
-                ]
-            ),
-            "total_volumes": _series(
-                [
-                    100.0,
-                    100.0,
-                    100.0,
-                    100.0,
-                    100.0,
-                    100.0,
-                    100.0,
-                    100.0,
-                    100.0,
-                ]
-            ),
-        },
-        resistance_break=True,
-    )
-
-    assert (
-        result.price_structure.resistance_break
-        is False
-    )
-
-    assert (
-        result.evidence.resistance_break
-        is True
     )
 
 
@@ -254,24 +329,15 @@ def test_analyzer_handles_insufficient_market_data_safely() -> None:
         is EarlyMovementState.NORMAL
     )
 
-    assert result.price_structure.support_level is None
+    assert (
+        result.breakout_confirmation.retest_confirmed
+        is False
+    )
 
+    assert result.price_structure.support_level is None
     assert result.price_structure.resistance_level is None
 
-    assert (
-        result.price_structure.support_break
-        is False
-    )
-
-    assert (
-        result.price_structure.resistance_break
-        is False
-    )
-
     assert result.metrics.price_acceleration is None
-
     assert result.metrics.abnormal_volume_ratio is None
-
     assert result.metrics.volatility_expansion is None
-
     assert result.metrics.persistence_score is None
