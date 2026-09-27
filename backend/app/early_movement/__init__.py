@@ -10,6 +10,12 @@ from app.early_movement.early_movement_breakout_confirmation_detector import (
 )
 from app.early_movement.early_movement_evaluator import EarlyMovementEvaluator
 from app.early_movement.early_movement_evidence import EarlyMovementEvidence
+from app.early_movement.early_movement_false_breakout_risk import (
+    EarlyMovementFalseBreakoutRisk,
+)
+from app.early_movement.early_movement_false_breakout_risk_evaluator import (
+    EarlyMovementFalseBreakoutRiskEvaluator,
+)
 from app.early_movement.early_movement_metric_extractor import (
     EarlyMovementMetricExtractor,
 )
@@ -29,6 +35,8 @@ __all__ = [
     "EarlyMovementBreakoutConfirmationDetector",
     "EarlyMovementEvaluator",
     "EarlyMovementEvidence",
+    "EarlyMovementFalseBreakoutRisk",
+    "EarlyMovementFalseBreakoutRiskEvaluator",
     "EarlyMovementMetricExtractor",
     "EarlyMovementMetrics",
     "EarlyMovementPriceStructure",
