@@ -17,6 +17,12 @@ from app.early_movement.scanner.scanner_deep_analyzer import (
 from app.early_movement.scanner.scanner_market_asset import (
     EarlyMovementScannerMarketAsset,
 )
+from app.early_movement.scanner.scanner_ranked_result import (
+    EarlyMovementScannerRankedResult,
+)
+from app.early_movement.scanner.scanner_result_ranker import (
+    EarlyMovementScannerResultRanker,
+)
 
 __all__ = [
     "EarlyMovementScannerMarketAsset",
@@ -24,6 +30,8 @@ __all__ = [
     "EarlyMovementScannerCandidateSelector",
     "EarlyMovementScannerAnalysisResult",
     "EarlyMovementScannerDeepAnalyzer",
+    "EarlyMovementScannerRankedResult",
+    "EarlyMovementScannerResultRanker",
     "CoinGeckoEarlyMovementScannerMarketProvider",
     "EarlyMovementScannerDataError",
 ]
