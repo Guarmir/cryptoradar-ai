@@ -16,6 +16,9 @@ from app.services.routes.alert_router import (
 from app.services.routes.asset_router import (
     create_asset_router,
 )
+from app.services.routes.early_movement_scanner_router import (
+    create_early_movement_scanner_router,
+)
 from app.services.routes.push_router import (
     create_push_router,
 )
@@ -53,6 +56,10 @@ app.include_router(
 
 app.include_router(
     create_push_router()
+)
+
+app.include_router(
+    create_early_movement_scanner_router()
 )
 
 
