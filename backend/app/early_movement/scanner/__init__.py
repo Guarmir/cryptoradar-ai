@@ -2,6 +2,9 @@ from app.early_movement.scanner.coingecko_scanner_market_provider import (
     CoinGeckoEarlyMovementScannerMarketProvider,
     EarlyMovementScannerDataError,
 )
+from app.early_movement.scanner.early_movement_scanner import (
+    EarlyMovementScanner,
+)
 from app.early_movement.scanner.scanner_analysis_result import (
     EarlyMovementScannerAnalysisResult,
 )
@@ -23,8 +26,13 @@ from app.early_movement.scanner.scanner_ranked_result import (
 from app.early_movement.scanner.scanner_result_ranker import (
     EarlyMovementScannerResultRanker,
 )
+from app.early_movement.scanner.scanner_run_result import (
+    EarlyMovementScannerRunResult,
+)
 
 __all__ = [
+    "EarlyMovementScanner",
+    "EarlyMovementScannerRunResult",
     "EarlyMovementScannerMarketAsset",
     "EarlyMovementScannerCandidate",
     "EarlyMovementScannerCandidateSelector",
