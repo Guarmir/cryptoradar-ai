@@ -7,6 +7,10 @@ from app.early_movement.scanner.scanner_market_asset import (
     EarlyMovementScannerMarketAsset,
 )
 
+from app.services.coingecko_request_config import (
+    CoinGeckoRequestConfig,
+)
+
 
 class EarlyMovementScannerDataError(
     RuntimeError
@@ -34,6 +38,9 @@ class CoinGeckoEarlyMovementScannerMarketProvider:
         request_get: Optional[
             Callable[..., Any]
         ] = None,
+        request_config: Optional[
+            CoinGeckoRequestConfig
+        ] = None,
     ) -> None:
         if timeout <= 0:
             raise ValueError(
@@ -57,6 +64,11 @@ class CoinGeckoEarlyMovementScannerMarketProvider:
             or requests.get
         )
 
+        self._request_config = (
+            request_config
+            or CoinGeckoRequestConfig.from_environment()
+        )
+
     def fetch(
         self,
     ) -> tuple[
@@ -73,7 +85,7 @@ class CoinGeckoEarlyMovementScannerMarketProvider:
                 "sparkline": "false",
                 "price_change_percentage": "24h",
             },
-            headers=self.DEFAULT_HEADERS,
+            headers=self._request_config.headers,
             timeout=self._timeout,
         )
 

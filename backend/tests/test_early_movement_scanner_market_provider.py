@@ -4,6 +4,9 @@ from app.early_movement.scanner import (
     CoinGeckoEarlyMovementScannerMarketProvider,
     EarlyMovementScannerDataError,
 )
+from app.services.coingecko_request_config import (
+    CoinGeckoRequestConfig,
+)
 
 
 class FakeResponse:
@@ -67,10 +70,20 @@ def test_fetch_preserves_canonical_coin_id() -> None:
         CoinGeckoEarlyMovementScannerMarketProvider(
             asset_limit=100,
             request_get=fake_get,
+            request_config=CoinGeckoRequestConfig(
+                api_key="test-demo-key",
+            ),
         )
     )
 
     result = provider.fetch()
+
+    assert (
+        captured["headers"][
+            "x-cg-demo-api-key"
+        ]
+        == "test-demo-key"
+    )
 
     assert len(result) == 2
 

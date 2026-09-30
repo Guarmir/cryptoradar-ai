@@ -13,6 +13,9 @@ from app.ai.market_domain import (
 from app.ai.market_overview_provider import (
     MarketOverviewProvider,
 )
+from app.services.coingecko_request_config import (
+    CoinGeckoRequestConfig,
+)
 
 
 class MarketOverviewDataError(
@@ -45,6 +48,9 @@ class CoinGeckoMarketOverviewProvider(
         request_get: Optional[
             Callable[..., Any]
         ] = None,
+        request_config: Optional[
+            CoinGeckoRequestConfig
+        ] = None,
     ):
         if timeout <= 0:
             raise ValueError(
@@ -61,6 +67,11 @@ class CoinGeckoMarketOverviewProvider(
         self._request_get = (
             request_get
             or requests.get
+        )
+
+        self._request_config = (
+            request_config
+            or CoinGeckoRequestConfig.from_environment()
         )
 
     @property
@@ -168,7 +179,7 @@ class CoinGeckoMarketOverviewProvider(
     ) -> dict:
         response = self._request_get(
             self.GLOBAL_URL,
-            headers=self.DEFAULT_HEADERS,
+            headers=self._request_config.headers,
             timeout=self._timeout,
         )
 
@@ -219,7 +230,7 @@ class CoinGeckoMarketOverviewProvider(
                 "sparkline": "false",
                 "price_change_percentage": "24h",
             },
-            headers=self.DEFAULT_HEADERS,
+            headers=self._request_config.headers,
             timeout=self._timeout,
         )
 

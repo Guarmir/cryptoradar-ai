@@ -6,6 +6,9 @@ from app.monitoring.monitoring_market_data_provider import (
     MonitoringMarketDataProvider,
 )
 from app.monitoring.monitoring_target import MonitoringTarget
+from app.services.coingecko_request_config import (
+    CoinGeckoRequestConfig,
+)
 
 
 class MonitoringMarketDataError(RuntimeError):
@@ -28,6 +31,9 @@ class CoinGeckoMonitoringMarketDataProvider(
         *,
         timeout: int = 10,
         request_get: Optional[Callable[..., Any]] = None,
+        request_config: Optional[
+            CoinGeckoRequestConfig
+        ] = None,
     ):
         if timeout <= 0:
             raise ValueError(
@@ -36,6 +42,10 @@ class CoinGeckoMonitoringMarketDataProvider(
 
         self._timeout = timeout
         self._request_get = request_get or requests.get
+        self._request_config = (
+            request_config
+            or CoinGeckoRequestConfig.from_environment()
+        )
         self._resolved_coin_ids: dict[str, str] = {}
 
     def fetch_market_data(
@@ -53,7 +63,7 @@ class CoinGeckoMonitoringMarketDataProvider(
                 "ids": coin_id,
                 "price_change_percentage": "24h",
             },
-            headers=self.DEFAULT_HEADERS,
+            headers=self._request_config.headers,
             timeout=self._timeout,
         )
 
@@ -117,7 +127,7 @@ class CoinGeckoMonitoringMarketDataProvider(
             params={
                 "query": symbol,
             },
-            headers=self.DEFAULT_HEADERS,
+            headers=self._request_config.headers,
             timeout=self._timeout,
         )
 
