@@ -3,10 +3,15 @@ from typing import Optional
 from fastapi import (
     APIRouter,
     HTTPException,
+    Request,
 )
 
 from app.early_movement.scanner import (
     EarlyMovementScanner,
+)
+
+from app.early_movement.scanner.scanner_runtime_status import (
+    build_early_movement_scanner_runtime_status,
 )
 
 
@@ -184,5 +189,22 @@ def create_early_movement_scanner_router(
             ),
             "signals": signals,
         }
+    @router.get(
+        "/early-movement/status",
+    )
+    def early_movement_status(
+        request: Request,
+    ):
+        runtime = getattr(
+            request.app.state,
+            "early_movement_scanner_runtime",
+            None,
+        )
+
+        return (
+            build_early_movement_scanner_runtime_status(
+                runtime,
+            )
+        )
 
     return router

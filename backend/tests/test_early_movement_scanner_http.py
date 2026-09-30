@@ -221,3 +221,22 @@ def test_early_movement_scan_returns_safe_error(
             "temporariamente indisponível."
         )
     )
+
+def test_early_movement_status_reaches_http() -> None:
+    client = TestClient(
+        app,
+    )
+
+    response = client.get(
+        "/early-movement/status",
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert "enabled" in body
+    assert "running" in body
+    assert "interval_seconds" in body
+    assert "last_cycle_available" in body
+    assert "last_scheduler_error" in body
