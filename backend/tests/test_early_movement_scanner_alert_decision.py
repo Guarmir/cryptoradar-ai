@@ -11,7 +11,6 @@ from app.early_movement.scanner.scanner_run_result import (
     EarlyMovementScannerRunResult,
 )
 
-
 @dataclass(frozen=True)
 class FakeRankedResult:
     relevance_score: float
@@ -132,3 +131,44 @@ def test_alert_decision_limits_alert_count() -> None:
 
     assert decision.should_alert is True
     assert decision.results == signals[:3]
+
+def test_alert_decision_ignores_non_alertable_states() -> None:
+    normal = FakeRankedResult(
+        relevance_score=100.0,
+        state=EarlyMovementState.NORMAL,
+    )
+
+    observation = FakeRankedResult(
+        relevance_score=100.0,
+        state=EarlyMovementState.OBSERVATION,
+    )
+
+    early_movement = FakeRankedResult(
+        relevance_score=80.0,
+        state=EarlyMovementState.EARLY_MOVEMENT,
+    )
+
+    confirmed_movement = FakeRankedResult(
+        relevance_score=85.0,
+        state=EarlyMovementState.CONFIRMED_MOVEMENT,
+    )
+
+    decision_maker = (
+        EarlyMovementScannerAlertDecisionMaker()
+    )
+
+    decision = decision_maker.decide(
+        make_scan_result(
+            normal,
+            observation,
+            early_movement,
+            confirmed_movement,
+        )
+    )
+
+    assert decision.should_alert is True
+
+    assert decision.results == (
+        early_movement,
+        confirmed_movement,
+    )

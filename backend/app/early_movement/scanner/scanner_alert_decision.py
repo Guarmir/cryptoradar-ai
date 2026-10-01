@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from app.early_movement.early_movement_state import (
+    EarlyMovementState,
+)
 from app.early_movement.scanner.scanner_ranked_result import (
     EarlyMovementScannerRankedResult,
 )
@@ -20,6 +23,10 @@ class EarlyMovementScannerAlertDecision:
 class EarlyMovementScannerAlertDecisionMaker:
     DEFAULT_MIN_RELEVANCE_SCORE = 0.0
     DEFAULT_MAX_ALERTS = 3
+    ALERTABLE_STATES = (
+    EarlyMovementState.EARLY_MOVEMENT,
+    EarlyMovementState.CONFIRMED_MOVEMENT,
+)
 
     def __init__(
         self,
@@ -48,9 +55,10 @@ class EarlyMovementScannerAlertDecisionMaker:
             result
             for result in scan_result.ranked_results
             if (
-                result.state is not None
+                result.state
+                in self.ALERTABLE_STATES
                 and result.relevance_score
-                >= self._min_relevance_score
+            >= self._min_relevance_score
             )
         )[
             : self._max_alerts

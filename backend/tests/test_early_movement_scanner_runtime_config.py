@@ -17,7 +17,7 @@ def test_runtime_config_defaults_disabled() -> None:
     assert config.push_enabled is False
     assert (
         config.push_cooldown_seconds
-        == 300.0
+        == 3600.0
     )
 
     assert config.database_url is None

@@ -33,7 +33,7 @@ class EarlyMovementScannerPushCooldown:
         self._clock = clock
 
         self._last_delivered_at: dict[
-            tuple[str, str],
+            str,
             datetime,
         ] = {}
 
@@ -89,16 +89,5 @@ class EarlyMovementScannerPushCooldown:
     @staticmethod
     def _result_key(
         result: EarlyMovementScannerRankedResult,
-    ) -> tuple[str, str]:
-        state = result.state
-
-        state_value = (
-            state.value
-            if state is not None
-            else "unknown"
-        )
-
-        return (
-            result.coin_id,
-            state_value,
-        )
+    ) -> str:
+        return result.coin_id

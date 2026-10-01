@@ -34,7 +34,7 @@ class EarlyMovementScannerRuntimeConfig:
     interval_seconds: float = 300.0
 
     push_enabled: bool = False
-    push_cooldown_seconds: float = 300.0
+    push_cooldown_seconds: float = 3600.0
 
     database_url: Optional[str] = None
     push_scope_key: Optional[str] = None
@@ -98,7 +98,7 @@ class EarlyMovementScannerRuntimeConfig:
                 source.get(
                     EARLY_MOVEMENT_SCANNER_INTERVAL_ENV,
                 ),
-                default=300.0,
+               default=300.0,
                 environment_name=(
                     EARLY_MOVEMENT_SCANNER_INTERVAL_ENV
                 ),
@@ -119,7 +119,7 @@ class EarlyMovementScannerRuntimeConfig:
                 source.get(
                     EARLY_MOVEMENT_SCANNER_PUSH_COOLDOWN_ENV,
                 ),
-                default=300.0,
+                default=3600.0,
                 environment_name=(
                     EARLY_MOVEMENT_SCANNER_PUSH_COOLDOWN_ENV
                 ),

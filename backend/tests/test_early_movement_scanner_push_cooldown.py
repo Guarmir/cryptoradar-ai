@@ -184,3 +184,41 @@ def test_cooldown_clear_resets_state() -> None:
         )
         is True
     )
+
+def test_cooldown_blocks_same_asset_across_states() -> None:
+    clock = FakeClock(
+        datetime(
+            2026,
+            9,
+            29,
+            tzinfo=timezone.utc,
+        )
+    )
+
+    cooldown = (
+        EarlyMovementScannerPushCooldown(
+            cooldown_seconds=300,
+            clock=clock,
+        )
+    )
+
+    early_signal = FakeRankedResult(
+        coin_id="bitcoin",
+        state=EarlyMovementState.EARLY_MOVEMENT,
+    )
+
+    confirmed_signal = FakeRankedResult(
+        coin_id="bitcoin",
+        state=EarlyMovementState.CONFIRMED_MOVEMENT,
+    )
+
+    cooldown.mark_delivered(
+        early_signal
+    )
+
+    assert (
+        cooldown.can_deliver(
+            confirmed_signal
+        )
+        is False
+    )
