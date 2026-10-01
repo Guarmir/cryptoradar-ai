@@ -15,6 +15,12 @@ from app.early_movement.scanner.scanner_push_service import (
 from app.early_movement.scanner.scanner_run_result import (
     EarlyMovementScannerRunResult,
 )
+from app.early_movement.scanner.scanner_signal_history_record import (
+    EarlyMovementScannerSignalHistoryRecord,
+)
+from app.early_movement.scanner.scanner_signal_history_service import (
+    EarlyMovementScannerSignalHistoryService,
+)
 from app.push.push_delivery_models import (
     PushDeliveryBatchResult,
 )
@@ -26,6 +32,12 @@ class EarlyMovementScannerAutomationCycleResult:
     finished_at: datetime
     scan_result: EarlyMovementScannerRunResult
     alert_decision: EarlyMovementScannerAlertDecision
+
+    history_records: tuple[
+        EarlyMovementScannerSignalHistoryRecord,
+        ...,
+    ] = ()
+
     push_results: tuple[
         PushDeliveryBatchResult,
         ...,
@@ -42,6 +54,14 @@ class EarlyMovementScannerAutomationCycleResult:
         self,
     ) -> bool:
         return self.alert_decision.should_alert
+
+    @property
+    def history_record_count(
+        self,
+    ) -> int:
+        return len(
+            self.history_records
+        )
 
     @property
     def delivered_push_count(
@@ -63,6 +83,9 @@ class EarlyMovementScannerAutomationCycle:
         alert_decision_maker: Optional[
             EarlyMovementScannerAlertDecisionMaker
         ] = None,
+        history_service: Optional[
+            EarlyMovementScannerSignalHistoryService
+        ] = None,
         push_service: Optional[
             EarlyMovementScannerPushService
         ] = None,
@@ -75,6 +98,10 @@ class EarlyMovementScannerAutomationCycle:
         self._alert_decision_maker = (
             alert_decision_maker
             or EarlyMovementScannerAlertDecisionMaker()
+        )
+
+        self._history_service = (
+            history_service
         )
 
         self._push_service = push_service
@@ -93,6 +120,19 @@ class EarlyMovementScannerAutomationCycle:
                 scan_result,
             )
         )
+
+        history_records: tuple[
+            EarlyMovementScannerSignalHistoryRecord,
+            ...,
+        ] = ()
+
+        if self._history_service is not None:
+            history_records = (
+                self._history_service.record(
+                    scan_result=scan_result,
+                    alert_decision=alert_decision,
+                )
+            )
 
         push_results: tuple[
             PushDeliveryBatchResult,
@@ -116,6 +156,7 @@ class EarlyMovementScannerAutomationCycle:
                 finished_at=finished_at,
                 scan_result=scan_result,
                 alert_decision=alert_decision,
+                history_records=history_records,
                 push_results=push_results,
             )
         )

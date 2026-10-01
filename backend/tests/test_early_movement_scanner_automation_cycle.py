@@ -66,6 +66,34 @@ class FakePushService:
 
         return self.results
 
+class FakeHistoryService:
+    def __init__(
+        self,
+        records=(),
+    ) -> None:
+        self.records = records
+        self.call_count = 0
+        self.received_scan_result = None
+        self.received_alert_decision = None
+
+    def record(
+        self,
+        *,
+        scan_result,
+        alert_decision,
+    ):
+        self.call_count += 1
+
+        self.received_scan_result = (
+            scan_result
+        )
+
+        self.received_alert_decision = (
+            alert_decision
+        )
+
+        return self.records
+
 
 def make_scan_result() -> EarlyMovementScannerRunResult:
     return EarlyMovementScannerRunResult(
@@ -180,5 +208,63 @@ def test_automation_cycle_delivers_push() -> None:
 
     assert (
         result.delivered_push_count
+        == 1
+    )
+
+def test_automation_cycle_records_history() -> None:
+    scan_result = make_scan_result()
+
+    alert_decision = (
+        EarlyMovementScannerAlertDecision(
+            should_alert=False,
+            results=(),
+        )
+    )
+
+    scanner = FakeScanner(
+        scan_result,
+    )
+
+    decision_maker = FakeAlertDecisionMaker(
+        alert_decision,
+    )
+
+    history_record = object()
+
+    history_service = FakeHistoryService(
+        records=(
+            history_record,
+        ),
+    )
+
+    cycle = EarlyMovementScannerAutomationCycle(
+        scanner=scanner,
+        alert_decision_maker=decision_maker,
+        history_service=history_service,
+    )
+
+    result = cycle.run()
+
+    assert (
+        history_service.call_count
+        == 1
+    )
+
+    assert (
+        history_service.received_scan_result
+        is scan_result
+    )
+
+    assert (
+        history_service.received_alert_decision
+        is alert_decision
+    )
+
+    assert result.history_records == (
+        history_record,
+    )
+
+    assert (
+        result.history_record_count
         == 1
     )

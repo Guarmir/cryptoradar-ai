@@ -3,6 +3,9 @@ from typing import Optional
 from app.early_movement.scanner.early_movement_scanner import (
     EarlyMovementScanner,
 )
+from app.early_movement.scanner.postgresql_scanner_signal_history_store import (
+    PostgreSQLEarlyMovementScannerSignalHistoryStore,
+)
 from app.early_movement.scanner.scanner_alert_decision import (
     EarlyMovementScannerAlertDecisionMaker,
 )
@@ -27,6 +30,9 @@ from app.early_movement.scanner.scanner_runtime_config import (
 from app.early_movement.scanner.scanner_scheduler import (
     EarlyMovementScannerScheduler,
 )
+from app.early_movement.scanner.scanner_signal_history_service import (
+    EarlyMovementScannerSignalHistoryService,
+)
 from app.push.firebase_admin_push_sender import (
     FirebaseAdminPushSender,
 )
@@ -38,11 +44,32 @@ from app.push.push_delivery_service import (
 )
 
 
+HISTORY_SCOPE_KEY = (
+    "early-movement-production"
+)
+
+
 def build_early_movement_scanner_runtime(
     config: EarlyMovementScannerRuntimeConfig,
 ) -> Optional[EarlyMovementScannerRuntime]:
     if not config.enabled:
         return None
+
+    history_service = None
+
+    if config.database_url is not None:
+        history_store = (
+            PostgreSQLEarlyMovementScannerSignalHistoryStore(
+                database_url=config.database_url,
+                scope_key=HISTORY_SCOPE_KEY,
+            )
+        )
+
+        history_service = (
+            EarlyMovementScannerSignalHistoryService(
+                store=history_store,
+            )
+        )
 
     push_service = None
 
@@ -100,6 +127,7 @@ def build_early_movement_scanner_runtime(
             alert_decision_maker=(
                 EarlyMovementScannerAlertDecisionMaker()
             ),
+            history_service=history_service,
             push_service=push_service,
         )
     )
