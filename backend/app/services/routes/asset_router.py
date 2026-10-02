@@ -337,24 +337,19 @@ def create_asset_router() -> APIRouter:
             coin_id
         )
 
+        if not market:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Dados de mercado "
+                    "indisponíveis."
+                ),
+            )
+
         chart_data = get_chart_data(
             coin_id,
             days,
         )
-
-        if not market:
-            return {
-                "error": (
-                    "Dados indisponíveis "
-                    "no momento. "
-                    "Tente novamente "
-                    "em instantes."
-                ),
-                **build_empty_asset_response(
-                    coin,
-                    days,
-                ),
-            }
 
         market_cap = safe_float(
             market.get("market_cap")

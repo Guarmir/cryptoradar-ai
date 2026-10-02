@@ -179,3 +179,40 @@ def test_asset_route_uses_ai_score_engine(
     assert payload["score"] == 57
     assert payload["signal"] == "neutral"
     assert payload["days"] == 1
+
+def test_asset_route_returns_503_when_market_data_is_unavailable(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        asset_router_module,
+        "resolve_coin_id",
+        lambda coin: "uniswap",
+    )
+
+    monkeypatch.setattr(
+        asset_router_module,
+        "get_market_data",
+        lambda coin_id: None,
+    )
+
+    monkeypatch.setattr(
+        asset_router_module,
+        "get_chart_data",
+        lambda coin_id, days: {
+            "prices": [],
+        },
+    )
+
+    client = _build_client()
+
+    response = client.get(
+        "/asset/UNI"
+    )
+
+    assert response.status_code == 503
+
+    payload = response.json()
+
+    assert payload["detail"] == (
+        "Dados de mercado indisponíveis."
+    )
