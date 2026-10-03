@@ -80,3 +80,48 @@ def test_cache_round_trip() -> None:
     assert result == {
         "price": 100,
     }
+
+def test_get_market_data_logs_provider_http_error(
+    monkeypatch,
+    caplog,
+) -> None:
+    coin_id = "test-provider-error"
+
+    market_data_service.market_cache.pop(
+        coin_id,
+        None,
+    )
+
+    class FakeResponse:
+        status_code = 429
+
+        def json(self):
+            return {
+                "status": {
+                    "error_code": 429,
+                    "error_message": "Rate limit",
+                },
+            }
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = market_data_service.get_market_data(
+        coin_id,
+    )
+
+    assert result is None
+
+    assert "429" in caplog.text
+
+    assert coin_id in caplog.text

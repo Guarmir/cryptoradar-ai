@@ -1,7 +1,11 @@
+import logging
 import time
 
 import requests
 from fastapi import HTTPException
+
+
+logger = logging.getLogger(__name__)
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
@@ -218,6 +222,13 @@ def get_market_data(
         )
 
         if response.status_code != 200:
+            logger.warning(
+                "CoinGecko market request failed: "
+                "coin_id=%s status_code=%s",
+                coin_id,
+                response.status_code,
+            )
+
             return None
 
         data = response.json()
