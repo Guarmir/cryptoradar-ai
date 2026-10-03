@@ -125,3 +125,171 @@ def test_get_market_data_logs_provider_http_error(
     assert "429" in caplog.text
 
     assert coin_id in caplog.text
+
+def test_get_market_data_uses_stale_cache_on_provider_failure(
+    monkeypatch,
+) -> None:
+    coin_id = "test-stale-market"
+
+    stale_market = {
+        "id": coin_id,
+        "symbol": "tsm",
+        "name": "Test Stale Market",
+        "current_price": 123.45,
+    }
+
+    market_data_service.market_cache[
+        coin_id
+    ] = {
+        "data": stale_market,
+        "timestamp": 0,
+    }
+
+    class FakeResponse:
+        status_code = 429
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = market_data_service.get_market_data(
+        coin_id,
+    )
+
+    assert result == stale_market
+
+def test_get_market_data_uses_stale_cache_on_request_exception(
+    monkeypatch,
+) -> None:
+    coin_id = "test-stale-exception"
+
+    stale_market = {
+        "id": coin_id,
+        "symbol": "tse",
+        "name": "Test Stale Exception",
+        "current_price": 456.78,
+    }
+
+    market_data_service.market_cache[
+        coin_id
+    ] = {
+        "data": stale_market,
+        "timestamp": 0,
+    }
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        raise TimeoutError(
+            "Provider timeout"
+        )
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = market_data_service.get_market_data(
+        coin_id,
+    )
+
+    assert result == stale_market
+
+def test_get_chart_data_uses_stale_cache_on_provider_failure(
+    monkeypatch,
+) -> None:
+    coin_id = "test-stale-chart"
+    days = 1
+    cache_key = f"{coin_id}_{days}"
+
+    stale_chart = {
+        "prices": [
+            [1000, 10.0],
+            [2000, 11.0],
+        ],
+    }
+
+    market_data_service.chart_cache[
+        cache_key
+    ] = {
+        "data": stale_chart,
+        "timestamp": 0,
+    }
+
+    class FakeResponse:
+        status_code = 429
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = market_data_service.get_chart_data(
+        coin_id,
+        days,
+    )
+
+    assert result == stale_chart
+
+def test_get_chart_data_uses_stale_cache_on_request_exception(
+    monkeypatch,
+) -> None:
+    coin_id = "test-stale-chart-exception"
+    days = 1
+    cache_key = f"{coin_id}_{days}"
+
+    stale_chart = {
+        "prices": [
+            [1000, 20.0],
+            [2000, 21.0],
+        ],
+    }
+
+    market_data_service.chart_cache[
+        cache_key
+    ] = {
+        "data": stale_chart,
+        "timestamp": 0,
+    }
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        raise TimeoutError(
+            "Provider timeout"
+        )
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = market_data_service.get_chart_data(
+        coin_id,
+        days,
+    )
+
+    assert result == stale_chart

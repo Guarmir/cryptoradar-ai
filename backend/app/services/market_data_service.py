@@ -195,6 +195,15 @@ def resolve_coin_id(
 def get_market_data(
     coin_id: str,
 ):
+    stale_cached = market_cache.get(
+        coin_id,
+    )
+
+    stale_market = (
+        stale_cached.get("data")
+        if stale_cached
+        else None
+    )
     cached = get_cached(
         market_cache,
         coin_id,
@@ -229,7 +238,7 @@ def get_market_data(
                 response.status_code,
             )
 
-            return None
+            return stale_market
 
         data = response.json()
 
@@ -247,7 +256,7 @@ def get_market_data(
         return market
 
     except Exception:
-        return None
+        return stale_market
 
 
 def get_chart_data(
@@ -255,6 +264,16 @@ def get_chart_data(
     days: int,
 ):
     cache_key = f"{coin_id}_{days}"
+
+    stale_cached = chart_cache.get(
+        cache_key,
+    )
+
+    stale_chart = (
+        stale_cached.get("data")
+        if stale_cached
+        else None
+    )
 
     cached = get_cached(
         chart_cache,
@@ -288,7 +307,7 @@ def get_chart_data(
         )
 
         if response.status_code != 200:
-            return {
+            return stale_chart or {
                 "prices": [],
             }
 
@@ -303,10 +322,9 @@ def get_chart_data(
         return data
 
     except Exception:
-        return {
+        return stale_chart or {
             "prices": [],
         }
-
 
 def safe_float(
     value,
