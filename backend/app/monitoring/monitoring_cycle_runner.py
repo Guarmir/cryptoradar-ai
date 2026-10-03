@@ -65,11 +65,38 @@ class MonitoringCycleRunner:
                 MonitoringTargetExecution
             ] = []
 
+            fetch_batch = getattr(
+                self._service,
+                "fetch_market_data_batch",
+                None,
+            )
+
+            batch_market_data = None
+
+            if callable(fetch_batch):
+                try:
+                    batch_market_data = fetch_batch(
+                        symbols,
+                    )
+                except Exception:
+                    batch_market_data = None
+
             for symbol in symbols:
                 try:
-                    result = self._service.run_cycle(
-                        symbol,
-                    )
+                    if (
+                        batch_market_data is not None
+                        and symbol in batch_market_data
+                    ):
+                        result = (
+                            self._service.observe_market_data(
+                                symbol,
+                                batch_market_data[symbol],
+                            )
+                        )
+                    else:
+                        result = self._service.run_cycle(
+                            symbol,
+                        )
 
                     market_events = (
                         self._evaluate_market_events(

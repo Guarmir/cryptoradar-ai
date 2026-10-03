@@ -191,6 +191,100 @@ def resolve_coin_id(
 
     return None
 
+def get_market_data_batch(
+    coin_ids: list[str],
+) -> dict[str, dict]:
+    normalized_ids = list(
+        dict.fromkeys(
+            coin_id.strip().lower()
+            for coin_id in coin_ids
+            if coin_id.strip()
+        )
+    )
+
+    if not normalized_ids:
+        return {}
+
+    markets: dict[str, dict] = {}
+    missing_ids: list[str] = []
+
+    for coin_id in normalized_ids:
+        cached = get_cached(
+            market_cache,
+            coin_id,
+            MARKET_TTL,
+        )
+
+        if cached:
+            markets[coin_id] = cached
+        else:
+            missing_ids.append(
+                coin_id,
+            )
+
+    if not missing_ids:
+        return markets
+
+    url = (
+        f"{COINGECKO_API}/coins/markets"
+    )
+
+    params = {
+        "vs_currency": "usd",
+        "ids": ",".join(
+            missing_ids
+        ),
+        "price_change_percentage": "24h",
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=20,
+        )
+
+        if response.status_code != 200:
+            logger.warning(
+                "CoinGecko batch market request "
+                "failed: coin_ids=%s "
+                "status_code=%s",
+                ",".join(missing_ids),
+                response.status_code,
+            )
+
+            return markets
+
+        data = response.json()
+
+        if not isinstance(data, list):
+            return markets
+
+        for market in data:
+            if not isinstance(
+                market,
+                dict,
+            ):
+                continue
+
+            coin_id = market.get("id")
+
+            if not coin_id:
+                continue
+
+            markets[coin_id] = market
+
+            set_cached(
+                market_cache,
+                coin_id,
+                market,
+            )
+
+        return markets
+
+    except Exception:
+        return markets
+
 
 def get_market_data(
     coin_id: str,

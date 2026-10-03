@@ -293,3 +293,233 @@ def test_get_chart_data_uses_stale_cache_on_request_exception(
     )
 
     assert result == stale_chart
+
+def test_get_market_data_batch_fetches_multiple_assets_in_one_request(
+    monkeypatch,
+) -> None:
+    coin_ids = [
+        "bitcoin",
+        "ethereum",
+        "solana",
+    ]
+
+    for coin_id in coin_ids:
+        market_data_service.market_cache.pop(
+            coin_id,
+            None,
+        )
+
+    received_requests = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return [
+                {
+                    "id": "bitcoin",
+                    "symbol": "btc",
+                    "current_price": 100,
+                },
+                {
+                    "id": "ethereum",
+                    "symbol": "eth",
+                    "current_price": 200,
+                },
+                {
+                    "id": "solana",
+                    "symbol": "sol",
+                    "current_price": 300,
+                },
+            ]
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        received_requests.append(
+            {
+                "url": url,
+                "params": params,
+            }
+        )
+
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = (
+        market_data_service.get_market_data_batch(
+            coin_ids,
+        )
+    )
+
+    assert len(received_requests) == 1
+
+    assert received_requests[0]["params"][
+        "ids"
+    ] == "bitcoin,ethereum,solana"
+
+    assert result["bitcoin"][
+        "current_price"
+    ] == 100
+
+    assert result["ethereum"][
+        "current_price"
+    ] == 200
+
+    assert result["solana"][
+        "current_price"
+    ] == 300
+
+def test_get_market_data_batch_fetches_only_uncached_assets(
+    monkeypatch,
+) -> None:
+    market_data_service.market_cache.clear()
+
+    bitcoin = {
+        "id": "bitcoin",
+        "symbol": "btc",
+        "current_price": 100,
+    }
+
+    ethereum = {
+        "id": "ethereum",
+        "symbol": "eth",
+        "current_price": 200,
+    }
+
+    market_data_service.set_cached(
+        market_data_service.market_cache,
+        "bitcoin",
+        bitcoin,
+    )
+
+    market_data_service.set_cached(
+        market_data_service.market_cache,
+        "ethereum",
+        ethereum,
+    )
+
+    received_requests = []
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return [
+                {
+                    "id": "solana",
+                    "symbol": "sol",
+                    "current_price": 300,
+                },
+            ]
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        received_requests.append(
+            params,
+        )
+
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = (
+        market_data_service.get_market_data_batch(
+            [
+                "bitcoin",
+                "ethereum",
+                "solana",
+            ],
+        )
+    )
+
+    assert len(received_requests) == 1
+
+    assert received_requests[0][
+        "ids"
+    ] == "solana"
+
+    assert set(result) == {
+        "bitcoin",
+        "ethereum",
+        "solana",
+    }
+
+def test_get_market_data_batch_makes_no_request_when_all_assets_are_cached(
+    monkeypatch,
+) -> None:
+    market_data_service.market_cache.clear()
+
+    bitcoin = {
+        "id": "bitcoin",
+        "symbol": "btc",
+        "current_price": 100,
+    }
+
+    ethereum = {
+        "id": "ethereum",
+        "symbol": "eth",
+        "current_price": 200,
+    }
+
+    market_data_service.set_cached(
+        market_data_service.market_cache,
+        "bitcoin",
+        bitcoin,
+    )
+
+    market_data_service.set_cached(
+        market_data_service.market_cache,
+        "ethereum",
+        ethereum,
+    )
+
+    request_count = 0
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        nonlocal request_count
+        request_count += 1
+
+        raise AssertionError(
+            "CoinGecko nao deveria ser chamada."
+        )
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = (
+        market_data_service.get_market_data_batch(
+            [
+                "bitcoin",
+                "ethereum",
+            ],
+        )
+    )
+
+    assert request_count == 0
+
+    assert set(result) == {
+        "bitcoin",
+        "ethereum",
+    }

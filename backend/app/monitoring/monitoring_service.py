@@ -32,6 +32,37 @@ class MonitoringService:
     def registered_symbols(self) -> tuple[str, ...]:
         return self._engine.registered_symbols
 
+    def fetch_market_data_batch(
+        self,
+        symbols,
+    ):
+        targets = []
+
+        for symbol in symbols:
+            state = self._engine.state_for(
+                symbol,
+            )
+
+            if state is None:
+                continue
+
+            targets.append(
+                state.target,
+            )
+
+        fetch_batch = getattr(
+            self._market_data_provider,
+            "fetch_market_data_batch",
+            None,
+        )
+
+        if not callable(fetch_batch):
+            return None
+
+        return fetch_batch(
+            targets,
+        )
+
     def restore_from_store(
         self,
     ) -> tuple[MonitoringState, ...]:
@@ -84,7 +115,7 @@ class MonitoringService:
 
             raise KeyError(
                 f"O ativo {normalized or symbol} "
-                "não está registrado para monitoramento."
+                "nao esta registrado para monitoramento."
             )
 
         market_data = (
@@ -92,6 +123,28 @@ class MonitoringService:
                 state.target,
             )
         )
+
+        return self.observe_market_data(
+            symbol,
+            market_data,
+        )
+
+    def observe_market_data(
+        self,
+        symbol: str,
+        market_data,
+    ) -> MonitoringCycleResult:
+        state = self._engine.state_for(
+            symbol,
+        )
+
+        if state is None:
+            normalized = symbol.strip().upper()
+
+            raise KeyError(
+                f"O ativo {normalized or symbol} "
+                "nao esta registrado para monitoramento."
+            )
 
         result = self._engine.observe_market_data(
             state.target.symbol,

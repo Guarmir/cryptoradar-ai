@@ -48,6 +48,93 @@ class CoinGeckoMonitoringMarketDataProvider(
         )
         self._resolved_coin_ids: dict[str, str] = {}
 
+    def fetch_market_data_batch(
+        self,
+        targets: list[MonitoringTarget],
+    ) -> dict[str, Mapping[str, Any]]:
+        if not targets:
+            return {}
+
+        target_by_coin_id: dict[
+            str,
+            MonitoringTarget,
+        ] = {}
+
+        coin_ids: list[str] = []
+
+        for target in targets:
+            coin_id = self._coin_id_for_target(
+                target,
+            )
+
+            if coin_id in target_by_coin_id:
+                continue
+
+            target_by_coin_id[
+                coin_id
+            ] = target
+
+            coin_ids.append(
+                coin_id,
+            )
+
+        response = self._request_get(
+            self.MARKETS_URL,
+            params={
+                "vs_currency": "usd",
+                "ids": ",".join(
+                    coin_ids
+                ),
+                "price_change_percentage": "24h",
+            },
+            headers=self._request_config.headers,
+            timeout=self._timeout,
+        )
+
+        self._validate_response(
+            response,
+            operation=(
+                "buscar dados de mercado em lote"
+            ),
+        )
+
+        payload = response.json()
+
+        if not isinstance(payload, list):
+            raise MonitoringMarketDataError(
+                "Resposta de mercado em lote "
+                "invalida."
+            )
+
+        result: dict[
+            str,
+            Mapping[str, Any],
+        ] = {}
+
+        for market_data in payload:
+            if not isinstance(
+                market_data,
+                dict,
+            ):
+                continue
+
+            coin_id = str(
+                market_data.get("id") or ""
+            ).strip()
+
+            target = target_by_coin_id.get(
+                coin_id,
+            )
+
+            if target is None:
+                continue
+
+            result[
+                target.symbol
+            ] = market_data
+
+        return result
+
     def fetch_market_data(
         self,
         target: MonitoringTarget,
