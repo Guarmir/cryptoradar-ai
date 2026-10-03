@@ -21,6 +21,9 @@ from app.services.asset_analysis_service import (
     get_ai_confidence,
     get_ai_signal,
 )
+from app.services.market_data_prefetch import (
+    ensure_default_market_data,
+)
 
 
 def create_asset_router() -> APIRouter:
@@ -332,6 +335,9 @@ def create_asset_router() -> APIRouter:
                     days,
                 ),
             }
+        ensure_default_market_data(
+            coin_id
+        )
 
         market = get_market_data(
             coin_id

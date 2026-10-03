@@ -206,9 +206,24 @@ def get_market_data_batch(
         return {}
 
     markets: dict[str, dict] = {}
+    stale_markets: dict[str, dict] = {}
     missing_ids: list[str] = []
 
     for coin_id in normalized_ids:
+        cached_item = market_cache.get(
+            coin_id,
+        )
+
+        if cached_item:
+            stale_data = cached_item.get(
+                "data",
+            )
+
+            if stale_data:
+                stale_markets[
+                    coin_id
+                ] = stale_data
+
         cached = get_cached(
             market_cache,
             coin_id,
@@ -253,7 +268,10 @@ def get_market_data_batch(
                 response.status_code,
             )
 
-            return markets
+            return {
+                **stale_markets,
+                **markets,
+            }
 
         data = response.json()
 
@@ -283,7 +301,10 @@ def get_market_data_batch(
         return markets
 
     except Exception:
-        return markets
+        return {
+            **stale_markets,
+            **markets,
+        }
 
 
 def get_market_data(
@@ -401,6 +422,15 @@ def get_chart_data(
         )
 
         if response.status_code != 200:
+            logger.warning(
+                "CoinGecko chart request failed: "
+                "coin_id=%s days=%s "
+                "status_code=%s",
+                coin_id,
+                days,
+                response.status_code,
+            )
+
             return stale_chart or {
                 "prices": [],
             }
