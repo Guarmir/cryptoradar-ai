@@ -14,6 +14,10 @@ from app.early_movement.scanner.scanner_runtime_status import (
     build_early_movement_scanner_runtime_status,
 )
 
+from app.early_movement.scanner.scanner_confirmation_serializer import (
+    EarlyMovementScannerConfirmationSerializer,
+)
+
 
 def create_early_movement_scanner_router(
     *,
@@ -33,6 +37,10 @@ def create_early_movement_scanner_router(
             candidate_limit=10,
             result_limit=5,
         )
+    )
+
+    confirmation_serializer = (
+        EarlyMovementScannerConfirmationSerializer()
     )
 
     @router.get(
@@ -135,6 +143,11 @@ def create_early_movement_scanner_router(
                     ),
                     "state": (
                         evidence.state.value
+                    ),
+                    "confirmation": (
+                        confirmation_serializer.serialize(
+                            evidence,
+                        )
                     ),
                     "current_price": (
                         asset.current_price

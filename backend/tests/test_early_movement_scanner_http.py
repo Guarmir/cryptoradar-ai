@@ -204,6 +204,37 @@ def test_early_movement_scan_reaches_http(
         == "up"
     )
 
+    confirmation = signal[
+        "confirmation"
+    ]
+
+    assert (
+        confirmation["target_state"]
+        == "confirmed_movement"
+    )
+
+    assert (
+        confirmation["passed_count"]
+        == 6
+    )
+
+    assert (
+        confirmation["failed_count"]
+        == 1
+    )
+
+    assert (
+        confirmation["is_confirmed"]
+        is False
+    )
+
+    assert (
+        confirmation[
+            "missing_criteria"
+        ][0]["key"]
+        == "abnormal_volume_ratio"
+    )
+
 
 def test_early_movement_scan_returns_safe_error(
     monkeypatch,
