@@ -129,6 +129,9 @@ class EarlyMovementScanner:
             successful_analysis_count=(
                 successful_analysis_count
             ),
+            analysis_results=(
+                analysis_results
+            ),
             ranked_results=(
                 ranked_results
             ),

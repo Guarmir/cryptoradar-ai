@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from app.early_movement.scanner.scanner_analysis_result import (
+    EarlyMovementScannerAnalysisResult,
+)
 from app.early_movement.scanner.scanner_ranked_result import (
     EarlyMovementScannerRankedResult,
 )
@@ -16,6 +19,11 @@ class EarlyMovementScannerRunResult:
         EarlyMovementScannerRankedResult,
         ...,
     ]
+
+    analysis_results: tuple[
+        EarlyMovementScannerAnalysisResult,
+        ...,
+    ] = ()
 
     @property
     def signal_count(
