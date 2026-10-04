@@ -1,3 +1,4 @@
+import pytest
 from app.early_movement.early_movement_evidence import (
     EarlyMovementEvidence,
 )
@@ -39,12 +40,47 @@ def test_serializes_missing_confirmation_criteria() -> None:
     assert result["failed_count"] == 1
     assert result["is_confirmed"] is False
 
-    assert result["missing_criteria"] == [
-        {
-            "key": "abnormal_volume_ratio",
-            "label": "Abnormal volume",
-            "value": 0.99,
-            "threshold": 1.50,
-            "reason": None,
-        }
+    missing = result[
+        "missing_criteria"
     ]
+
+    assert len(missing) == 1
+
+    assert (
+        missing[0]["key"]
+        == "abnormal_volume_ratio"
+    )
+
+    assert missing[0]["value"] == 0.99
+    assert missing[0]["threshold"] == 1.50
+
+    assert (
+        missing[0]["distance_ratio"]
+        == pytest.approx(0.34)
+    )
+
+    assert (
+        missing[0]["proximity"]
+        == "far"
+    )
+
+    blocker = result[
+        "main_blocker"
+    ]
+
+    assert blocker is not None
+
+    assert (
+        blocker["key"]
+        == "abnormal_volume_ratio"
+    )
+
+    assert (
+        blocker["distance_ratio"]
+        == pytest.approx(0.34)
+    )
+
+    assert (
+        blocker["proximity"]
+        == "far"
+    )

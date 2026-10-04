@@ -1,3 +1,11 @@
+from typing import Optional
+
+from app.early_movement.early_movement_confirmation_blocker_selector import (
+    EarlyMovementConfirmationBlockerSelector,
+)
+from app.early_movement.early_movement_confirmation_distance_calculator import (
+    EarlyMovementConfirmationDistanceCalculator,
+)
 from app.early_movement.early_movement_confirmation_explainer import (
     EarlyMovementConfirmationExplainer,
 )
@@ -10,11 +18,33 @@ class EarlyMovementScannerConfirmationSerializer:
     def __init__(
         self,
         *,
-        explainer: EarlyMovementConfirmationExplainer | None = None,
+        explainer: Optional[
+            EarlyMovementConfirmationExplainer
+        ] = None,
+        distance_calculator: Optional[
+            EarlyMovementConfirmationDistanceCalculator
+        ] = None,
+        blocker_selector: Optional[
+            EarlyMovementConfirmationBlockerSelector
+        ] = None,
     ) -> None:
         self._explainer = (
             explainer
             or EarlyMovementConfirmationExplainer()
+        )
+
+        self._distance_calculator = (
+            distance_calculator
+            or EarlyMovementConfirmationDistanceCalculator()
+        )
+
+        self._blocker_selector = (
+            blocker_selector
+            or EarlyMovementConfirmationBlockerSelector(
+                distance_calculator=(
+                    self._distance_calculator
+                ),
+            )
         )
 
     def serialize(
@@ -25,16 +55,56 @@ class EarlyMovementScannerConfirmationSerializer:
             evidence,
         )
 
-        failed_criteria = [
-            {
-                "key": criterion.key,
-                "label": criterion.label,
-                "value": criterion.value,
-                "threshold": criterion.threshold,
-                "reason": criterion.reason,
+        missing_criteria = []
+
+        for criterion in (
+            explanation.failed_criteria
+        ):
+            distance = (
+                self._distance_calculator.calculate(
+                    criterion,
+                )
+            )
+
+            missing_criteria.append(
+                {
+                    "key": criterion.key,
+                    "label": criterion.label,
+                    "value": criterion.value,
+                    "threshold": criterion.threshold,
+                    "reason": criterion.reason,
+                    "distance_ratio": (
+                        distance.distance_ratio
+                    ),
+                    "proximity": (
+                        distance.proximity
+                    ),
+                }
+            )
+
+        main_blocker = (
+            self._blocker_selector.select(
+                explanation.criteria,
+            )
+        )
+
+        serialized_blocker = None
+
+        if main_blocker is not None:
+            serialized_blocker = {
+                "key": main_blocker.key,
+                "label": main_blocker.label,
+                "value": main_blocker.value,
+                "threshold": (
+                    main_blocker.threshold
+                ),
+                "distance_ratio": (
+                    main_blocker.distance_ratio
+                ),
+                "proximity": (
+                    main_blocker.proximity
+                ),
             }
-            for criterion in explanation.failed_criteria
-        ]
 
         return {
             "target_state": (
@@ -50,6 +120,9 @@ class EarlyMovementScannerConfirmationSerializer:
                 explanation.is_confirmed
             ),
             "missing_criteria": (
-                failed_criteria
+                missing_criteria
+            ),
+            "main_blocker": (
+                serialized_blocker
             ),
         }
