@@ -78,14 +78,26 @@ def _fake_scan(
     )
 
     return SimpleNamespace(
-        universe_size=100,
-        candidate_count=10,
-        analyzed_count=10,
-        successful_analysis_count=9,
-        ranked_results=(
-            ranked,
+    universe_size=100,
+    candidate_count=10,
+    analyzed_count=10,
+    successful_analysis_count=9,
+    analysis_results=(
+        SimpleNamespace(
+            candidate=SimpleNamespace(
+                coin_id="uniswap",
+                symbol="UNI",
+                name="Uniswap",
+            ),
+            analysis=analysis,
+            chart_available=True,
+            error=None,
         ),
-    )
+    ),
+    ranked_results=(
+        ranked,
+    ),
+)
 
 
 def _fake_scan_failure(

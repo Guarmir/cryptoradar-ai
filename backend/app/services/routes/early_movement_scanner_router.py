@@ -54,6 +54,39 @@ def create_early_movement_scanner_router(
 
         signals = []
 
+        analysis_failures = []
+
+        for analysis_result in (
+            result.analysis_results
+        ):
+            if analysis_result.error is None:
+                continue
+
+            candidate = (
+                analysis_result.candidate
+            )
+
+            analysis_failures.append(
+                {
+                    "coin_id": (
+                        candidate.coin_id
+                    ),
+                    "symbol": (
+                        candidate.symbol
+                    ),
+                    "name": (
+                        candidate.name
+                    ),
+                    "chart_available": (
+                        analysis_result
+                        .chart_available
+                    ),
+                    "error": (
+                        analysis_result.error
+                    ),
+                }
+            )
+
         for ranked in (
             result.ranked_results
         ):
@@ -183,6 +216,12 @@ def create_early_movement_scanner_router(
             "successful_analysis_count": (
                 result
                 .successful_analysis_count
+            ),
+            "analysis_failure_count": len(
+                analysis_failures,
+            ),
+            "analysis_failures": (
+                analysis_failures
             ),
             "signal_count": len(
                 signals,
