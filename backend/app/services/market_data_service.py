@@ -3,6 +3,19 @@ import time
 
 import requests
 from fastapi import HTTPException
+from app.services.chart_request_cooldown import (
+    ChartRequestCooldown,
+)
+from app.services.chart_data_cache import (
+    ChartDataCache,
+)
+from app.services.coingecko_chart_client import (
+    CoinGeckoChartClient,
+    CoinGeckoChartRequestError,
+)
+from app.services.chart_acquisition_service import (
+    ChartAcquisitionService,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -56,7 +69,30 @@ coin_list_cache = {
 }
 
 market_cache = {}
-chart_cache = {}
+
+chart_data_cache = ChartDataCache()
+
+chart_cache = chart_data_cache.storage
+
+chart_request_cooldown = (
+    ChartRequestCooldown()
+)
+
+chart_client = CoinGeckoChartClient(
+    api_base_url=COINGECKO_API,
+    request_get=lambda *args, **kwargs: (
+        requests.get(
+            *args,
+            **kwargs,
+        )
+    ),
+)
+
+chart_acquisition_service = (
+    ChartAcquisitionService(
+        chart_fetcher=chart_client.fetch,
+    )
+)
 
 
 def get_cached(
@@ -373,77 +409,73 @@ def get_market_data(
     except Exception:
         return stale_market
 
+def get_cached_chart_data(
+    coin_id: str,
+    days: int,
+):
+    return chart_data_cache.get(
+        coin_id,
+        days,
+    )
+
 
 def get_chart_data(
     coin_id: str,
     days: int,
 ):
-    cache_key = f"{coin_id}_{days}"
-
-    stale_cached = chart_cache.get(
-        cache_key,
-    )
 
     stale_chart = (
-        stale_cached.get("data")
-        if stale_cached
-        else None
+        chart_data_cache.get_stale(
+            coin_id,
+            days,
+        )
     )
 
-    cached = get_cached(
-        chart_cache,
-        cache_key,
-        CHART_TTL,
+    cached = (
+        chart_data_cache.get(
+            coin_id,
+            days,
+        )
     )
 
     if cached:
         return cached
 
-    url = (
-        f"{COINGECKO_API}"
-        f"/coins/{coin_id}/market_chart"
-    )
-
-    params = {
-        "vs_currency": "usd",
-        "days": days,
-        "interval": (
-            "hourly"
-            if days <= 7
-            else "daily"
-        ),
-    }
+    if chart_request_cooldown.is_blocked():
+        return stale_chart or {
+            "prices": [],
+        }
 
     try:
-        response = requests.get(
-            url,
-            params=params,
-            timeout=20,
+        data = chart_acquisition_service.fetch(
+            coin_id,
+            days,
         )
 
-        if response.status_code != 200:
-            logger.warning(
-                "CoinGecko chart request failed: "
-                "coin_id=%s days=%s "
-                "status_code=%s",
-                coin_id,
-                days,
-                response.status_code,
-            )
-
-            return stale_chart or {
-                "prices": [],
-            }
-
-        data = response.json()
-
-        set_cached(
-            chart_cache,
-            cache_key,
+        chart_data_cache.set(
+            coin_id,
+            days,
             data,
         )
 
         return data
+
+    except CoinGeckoChartRequestError as exc:
+        if exc.status_code == 429:
+            chart_request_cooldown.activate()
+
+        logger.warning(
+            "CoinGecko chart request failed: "
+            "coin_id=%s days=%s "
+            "status_code=%s",
+            coin_id,
+            days,
+            exc.status_code,
+        )
+
+        return stale_chart or {
+            "prices": [],
+        }
 
     except Exception:
         return stale_chart or {

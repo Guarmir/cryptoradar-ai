@@ -3,6 +3,12 @@ from typing import Optional
 from app.early_movement.scanner.early_movement_scanner import (
     EarlyMovementScanner,
 )
+from app.early_movement.scanner.scanner_chart_loader import (
+    EarlyMovementScannerChartLoader,
+)
+from app.early_movement.scanner.scanner_deep_analyzer import (
+    EarlyMovementScannerDeepAnalyzer,
+)
 from app.early_movement.scanner.postgresql_scanner_signal_history_store import (
     PostgreSQLEarlyMovementScannerSignalHistoryStore,
 )
@@ -121,9 +127,24 @@ def build_early_movement_scanner_runtime(
             )
         )
 
+    scanner_chart_loader = (
+        EarlyMovementScannerChartLoader()
+    )
+
+    scanner = EarlyMovementScanner(
+        deep_analyzer=(
+            EarlyMovementScannerDeepAnalyzer(
+                chart_loader=scanner_chart_loader,
+            )
+        ),
+    )
+
     cycle = (
         EarlyMovementScannerAutomationCycle(
-            scanner=EarlyMovementScanner(),
+            scanner=scanner,
+            on_cycle_start=(
+                scanner_chart_loader.reset_budget
+            ),
             alert_decision_maker=(
                 EarlyMovementScannerAlertDecisionMaker()
             ),

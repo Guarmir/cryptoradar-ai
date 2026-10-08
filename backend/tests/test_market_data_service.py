@@ -294,6 +294,126 @@ def test_get_chart_data_uses_stale_cache_on_request_exception(
 
     assert result == stale_chart
 
+def test_chart_rate_limit_blocks_immediate_follow_up_requests(
+    monkeypatch,
+) -> None:
+    first_coin_id = "rate-limited-chart"
+    second_coin_id = "blocked-chart"
+    days = 7
+    market_data_service.chart_request_cooldown.reset()
+
+    market_data_service.chart_cache.pop(
+        f"{first_coin_id}_{days}",
+        None,
+    )
+
+    market_data_service.chart_cache.pop(
+        f"{second_coin_id}_{days}",
+        None,
+    )
+
+    request_count = 0
+
+    class FakeResponse:
+        status_code = 429
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        nonlocal request_count
+
+        request_count += 1
+
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    first_result = (
+        market_data_service.get_chart_data(
+            first_coin_id,
+            days,
+        )
+    )
+
+    second_result = (
+        market_data_service.get_chart_data(
+            second_coin_id,
+            days,
+        )
+    )
+
+    assert first_result == {
+        "prices": [],
+    }
+
+    assert second_result == {
+        "prices": [],
+    }
+
+    assert request_count == 1
+
+def test_chart_cooldown_uses_stale_cache_without_provider_request(
+    monkeypatch,
+) -> None:
+    coin_id = "stale-during-cooldown"
+    days = 7
+    cache_key = f"{coin_id}_{days}"
+
+    stale_chart = {
+        "prices": [
+            [1000, 10.0],
+            [2000, 11.0],
+        ],
+    }
+
+    market_data_service.chart_cache[
+        cache_key
+    ] = {
+        "data": stale_chart,
+        "timestamp": 0,
+    }
+
+    market_data_service.chart_request_cooldown.reset()
+    market_data_service.chart_request_cooldown.activate()
+
+    request_count = 0
+
+    def fake_get(
+        url,
+        params=None,
+        timeout=None,
+    ):
+        nonlocal request_count
+
+        request_count += 1
+
+        raise AssertionError(
+            "O provedor não deveria ser chamado "
+            "durante o cooldown."
+        )
+
+    monkeypatch.setattr(
+        market_data_service.requests,
+        "get",
+        fake_get,
+    )
+
+    result = market_data_service.get_chart_data(
+        coin_id,
+        days,
+    )
+
+    assert result == stale_chart
+    assert request_count == 0
+
+    market_data_service.chart_request_cooldown.reset()
+
 def test_get_market_data_batch_fetches_multiple_assets_in_one_request(
     monkeypatch,
 ) -> None:
@@ -523,3 +643,40 @@ def test_get_market_data_batch_makes_no_request_when_all_assets_are_cached(
         "bitcoin",
         "ethereum",
     }
+
+def test_get_cached_chart_data_returns_fresh_chart():
+    coin_id = "cached-test-coin"
+    days = 7
+    cache_key = f"{coin_id}_{days}"
+
+    expected = {
+        "prices": [
+            [1, 10.0],
+            [2, 11.0],
+        ],
+    }
+
+    market_data_service.chart_cache.pop(
+        cache_key,
+        None,
+    )
+
+    market_data_service.set_cached(
+        market_data_service.chart_cache,
+        cache_key,
+        expected,
+    )
+
+    result = (
+        market_data_service.get_cached_chart_data(
+            coin_id,
+            days,
+        )
+    )
+
+    assert result is expected
+
+    market_data_service.chart_cache.pop(
+        cache_key,
+        None,
+    )

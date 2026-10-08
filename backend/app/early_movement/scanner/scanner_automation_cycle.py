@@ -24,6 +24,7 @@ from app.early_movement.scanner.scanner_signal_history_service import (
 from app.push.push_delivery_models import (
     PushDeliveryBatchResult,
 )
+from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,9 @@ class EarlyMovementScannerAutomationCycle:
         push_service: Optional[
             EarlyMovementScannerPushService
         ] = None,
+            on_cycle_start: Optional[
+            Callable[[], None]
+        ] = None,
     ) -> None:
         self._scanner = (
             scanner
@@ -106,12 +110,17 @@ class EarlyMovementScannerAutomationCycle:
 
         self._push_service = push_service
 
+        self._on_cycle_start = on_cycle_start
+
     def run(
         self,
     ) -> EarlyMovementScannerAutomationCycleResult:
         started_at = datetime.now(
             timezone.utc,
         )
+
+        if self._on_cycle_start is not None:
+            self._on_cycle_start()
 
         scan_result = self._scanner.scan()
 

@@ -9,6 +9,9 @@ from app.early_movement.scanner.scanner_candidate import (
 from app.early_movement.scanner.scanner_market_asset import (
     EarlyMovementScannerMarketAsset,
 )
+from app.early_movement.scanner.scanner_asset_eligibility_filter import (
+    EarlyMovementScannerAssetEligibilityFilter,
+)
 
 
 class EarlyMovementScannerCandidateSelector:
@@ -20,6 +23,10 @@ class EarlyMovementScannerCandidateSelector:
         *,
         liquidity_evaluator: (
             EarlyMovementLiquidityEvaluator
+            | None
+        ) = None,
+        asset_eligibility_filter: (
+            EarlyMovementScannerAssetEligibilityFilter
             | None
         ) = None,
         minimum_liquidity_score: float = (
@@ -39,6 +46,11 @@ class EarlyMovementScannerCandidateSelector:
         self._liquidity_evaluator = (
             liquidity_evaluator
             or EarlyMovementLiquidityEvaluator()
+        )
+
+        self._asset_eligibility_filter = (
+            asset_eligibility_filter
+            or EarlyMovementScannerAssetEligibilityFilter()
         )
 
         self._minimum_liquidity_score = (
@@ -67,6 +79,12 @@ class EarlyMovementScannerCandidateSelector:
         ] = []
 
         for asset in assets:
+            if not (
+                self._asset_eligibility_filter
+                .is_eligible(asset)
+            ):
+                continue
+
             liquidity = (
                 self._liquidity_evaluator.evaluate(
                     {

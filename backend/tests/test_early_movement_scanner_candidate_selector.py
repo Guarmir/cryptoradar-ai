@@ -207,3 +207,63 @@ def test_selector_rejects_invalid_limit() -> None:
             (),
             limit=0,
         )
+
+def test_selector_excludes_stablecoins_before_candidate_limit() -> None:
+    selector = (
+        EarlyMovementScannerCandidateSelector()
+    )
+
+    assets = (
+        _asset(
+            coin_id="tether",
+            symbol="usdt",
+            total_volume=30_000_000_000,
+            market_cap=180_000_000_000,
+            change_24h=0.01,
+            rank=3,
+        ),
+        _asset(
+            coin_id="usd-coin",
+            symbol="usdc",
+            total_volume=6_000_000_000,
+            market_cap=70_000_000_000,
+            change_24h=0.02,
+            rank=6,
+        ),
+        _asset(
+            coin_id="worldcoin-wld",
+            symbol="wld",
+            total_volume=400_000_000,
+            market_cap=2_000_000_000,
+            change_24h=4.0,
+            rank=50,
+        ),
+        _asset(
+            coin_id="pump-fun",
+            symbol="pump",
+            total_volume=300_000_000,
+            market_cap=3_000_000_000,
+            change_24h=12.0,
+            rank=40,
+        ),
+    )
+
+    result = selector.select(
+        assets,
+        limit=2,
+    )
+
+    assert len(result) == 2
+
+    selected_coin_ids = {
+        candidate.coin_id
+        for candidate in result
+    }
+
+    assert selected_coin_ids == {
+        "worldcoin-wld",
+        "pump-fun",
+    }
+
+    assert "tether" not in selected_coin_ids
+    assert "usd-coin" not in selected_coin_ids

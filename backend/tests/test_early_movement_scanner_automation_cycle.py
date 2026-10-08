@@ -268,3 +268,37 @@ def test_automation_cycle_records_history() -> None:
         result.history_record_count
         == 1
     )
+
+def test_cycle_renews_chart_request_budget():
+    from app.early_movement.scanner.scanner_chart_loader import (
+        EarlyMovementScannerChartLoader,
+    )
+
+    loader = EarlyMovementScannerChartLoader(
+        chart_loader=lambda coin_id, days: {
+            "prices": [[1, 10.0]],
+        },
+        cache_loader=lambda coin_id, days: None,
+        request_budget=1,
+    )
+
+    class FakeScanner:
+        def scan(self):
+            loader("bitcoin", 7)
+            return "scan_result"
+
+    class FakeDecisionMaker:
+        def decide(self, scan_result):
+            return "decision"
+
+    cycle = EarlyMovementScannerAutomationCycle(
+        scanner=FakeScanner(),
+        alert_decision_maker=FakeDecisionMaker(),
+        on_cycle_start=loader.reset_budget,
+    )
+
+    cycle.run()
+    assert loader._request_count == 1
+
+    cycle.run()
+    assert loader._request_count == 1
