@@ -84,10 +84,26 @@ class ChartDataCache:
         days: int,
         data: Any,
     ) -> None:
+        if not isinstance(data, dict):
+            return
+
+        prices = data.get("prices")
+
+        if not isinstance(prices, list):
+            return
+
+        if not prices:
+            return
+
         cache_key = self._cache_key(
             coin_id,
             days,
         )
+
+        self._cache[cache_key] = {
+            "data": data,
+            "timestamp": time.time(),
+        }
 
         self._cache[cache_key] = {
             "data": data,
