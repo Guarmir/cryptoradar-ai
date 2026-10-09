@@ -1,38 +1,13 @@
-from app.services import (
-    market_data_service,
-)
-
+from app.services import market_data_service
 
 def test_resolves_preferred_aliases() -> None:
-    assert (
-        market_data_service.resolve_coin_id(
-            "btc"
-        )
-        == "bitcoin"
-    )
-
-    assert (
-        market_data_service.resolve_coin_id(
-            "ETH"
-        )
-        == "ethereum"
-    )
-
-    assert (
-        market_data_service.resolve_coin_id(
-            "uni"
-        )
-        == "uniswap"
-    )
+    assert market_data_service.resolve_coin_id("btc") == "bitcoin"
+    assert market_data_service.resolve_coin_id("ETH") == "ethereum"
+    assert market_data_service.resolve_coin_id("uni") == "uniswap"
 
 
 def test_empty_coin_returns_none() -> None:
-    assert (
-        market_data_service.resolve_coin_id(
-            "   "
-        )
-        is None
-    )
+    assert market_data_service.resolve_coin_id("   ") is None
 
 
 def test_safe_float() -> None:
@@ -680,3 +655,90 @@ def test_get_cached_chart_data_returns_fresh_chart():
         cache_key,
         None,
     )
+
+def test_get_coin_list_uses_stale_cache_when_rate_limited(
+    monkeypatch,
+) -> None:
+    from app.services.coingecko_request_coordinator import (
+        CoinGeckoRequestBlocked,
+    )
+
+    stale_coins = [
+        {"id": "bitcoin", "symbol": "btc", "name": "Bitcoin"},
+    ]
+
+    monkeypatch.setitem(
+        market_data_service.coin_list_cache,
+        "data",
+        stale_coins,
+    )
+    monkeypatch.setitem(
+        market_data_service.coin_list_cache,
+        "timestamp",
+        0,
+    )
+
+    def blocked_request(*args, **kwargs):
+        raise CoinGeckoRequestBlocked(
+            "Limite de requisições atingido."
+        )
+
+    monkeypatch.setattr(
+        market_data_service.coingecko_request_coordinator,
+        "execute",
+        blocked_request,
+    )
+
+    result = market_data_service.get_coin_list()
+
+    assert result == stale_coins
+
+def test_get_chart_data_uses_stale_cache_when_coordinator_blocks(
+    monkeypatch,
+) -> None:
+    from app.services.coingecko_request_coordinator import (
+        CoinGeckoRequestBlocked,
+    )
+
+    coin_id = "test-chart-coordinator-block"
+    days = 1
+
+    stale_chart = {
+        "prices": [[1000, 125.0]],
+    }
+
+    monkeypatch.setattr(
+        market_data_service.chart_data_cache,
+        "get",
+        lambda *args: None,
+    )
+
+    monkeypatch.setattr(
+        market_data_service.chart_data_cache,
+        "get_stale",
+        lambda *args: stale_chart,
+    )
+
+    monkeypatch.setattr(
+        market_data_service.chart_request_cooldown,
+        "is_blocked",
+        lambda: False,
+    )
+
+    def blocked_fetch(*args, **kwargs):
+        raise CoinGeckoRequestBlocked(
+            "Limite de requisições atingido."
+        )
+
+    monkeypatch.setattr(
+        market_data_service.chart_acquisition_service,
+        "fetch",
+        blocked_fetch,
+    )
+
+    result = market_data_service.get_chart_data(
+        coin_id,
+        days,
+    )
+
+    assert result == stale_chart

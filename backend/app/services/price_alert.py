@@ -2,6 +2,9 @@ import time
 import requests
 
 from app.services.score import resolve_coin, DEFAULT_HEADERS
+from app.services.coingecko_controlled_request import (
+    coingecko_controlled_get,
+)
 
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
 
@@ -21,7 +24,7 @@ def monitor_price(coin_query: str, target_price: float, interval: int = 15):
 
     while True:
         try:
-            response = requests.get(
+            response = coingecko_controlled_get(
                 COINGECKO_SIMPLE_PRICE_URL,
                 params={"ids": coin_id, "vs_currencies": "usd"},
                 headers=DEFAULT_HEADERS,

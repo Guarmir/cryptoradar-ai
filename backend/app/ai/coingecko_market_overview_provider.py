@@ -16,6 +16,12 @@ from app.ai.market_overview_provider import (
 from app.services.coingecko_request_config import (
     CoinGeckoRequestConfig,
 )
+from app.services.coingecko_controlled_request import (
+    coingecko_controlled_get,
+)
+from app.services.coingecko_request_coordinator import (
+    CoinGeckoRequestBlocked,
+)
 
 
 class MarketOverviewDataError(
@@ -73,6 +79,22 @@ class CoinGeckoMarketOverviewProvider(
             request_config
             or CoinGeckoRequestConfig.from_environment()
         )
+
+    def _controlled_get(
+        self,
+        url: str,
+        **kwargs: Any,
+    ) -> Any:
+        try:
+            return coingecko_controlled_get(
+                url,
+                request_get=self._request_get,
+                **kwargs,
+            )
+        except CoinGeckoRequestBlocked as error:
+            raise MarketOverviewDataError(
+                "Limite temporário da CoinGecko atingido."
+            ) from error
 
     @property
     def domain(
@@ -177,7 +199,7 @@ class CoinGeckoMarketOverviewProvider(
     def _fetch_global_data(
         self,
     ) -> dict:
-        response = self._request_get(
+        response = self._controlled_get(
             self.GLOBAL_URL,
             headers=self._request_config.headers,
             timeout=self._timeout,
@@ -220,7 +242,7 @@ class CoinGeckoMarketOverviewProvider(
         MarketOverviewAsset,
         ...,
     ]:
-        response = self._request_get(
+        response = self._controlled_get(
             self.MARKETS_URL,
             params={
                 "vs_currency": "usd",

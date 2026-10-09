@@ -94,6 +94,48 @@ class _FakeMarketDataProvider(
 class CoinGeckoMonitoringMarketDataProviderTest(
     unittest.TestCase
 ):
+    def test_coordinator_blocks_requests_after_http_429(self):
+        from unittest.mock import patch
+
+        from app.services.coingecko_request_coordinator import (
+            CoinGeckoRequestCoordinator,
+        )
+
+        request_get = _RecordingRequestGet(
+            [
+                _FakeResponse(429, {}),
+            ]
+        )
+
+        coordinator = CoinGeckoRequestCoordinator(
+            min_interval_seconds=0,
+            cooldown_seconds=60,
+        )
+
+        provider = CoinGeckoMonitoringMarketDataProvider(
+            request_get=request_get,
+        )
+
+        target = MonitoringTarget(
+            symbol="BTC",
+            coin_id="bitcoin",
+        )
+
+        with patch(
+            "app.monitoring.coingecko_monitoring_market_data_provider."
+            "coingecko_request_coordinator",
+            coordinator,
+        ):
+            with self.assertRaises(MonitoringMarketDataError):
+                provider.fetch_market_data(target)
+
+            with self.assertRaises(MonitoringMarketDataError):
+                provider.fetch_market_data(target)
+
+        self.assertEqual(
+            len(request_get.calls),
+            1,
+        )
     def test_uses_target_coin_id_without_search(self):
         request_get = _RecordingRequestGet(
             [

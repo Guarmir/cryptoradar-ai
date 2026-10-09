@@ -1,7 +1,4 @@
-from app.services import (
-    market_data_service,
-)
-
+from app.services import market_data_service
 
 def test_batch_uses_stale_cache_when_provider_is_rate_limited(
     monkeypatch,

@@ -11,6 +11,13 @@ from app.services.coingecko_request_config import (
     CoinGeckoRequestConfig,
 )
 
+from app.services.coingecko_request_coordinator import (
+    CoinGeckoRequestBlocked,
+)
+from app.services.coingecko_request_runtime import (
+    coingecko_request_coordinator,
+)
+
 
 class EarlyMovementScannerDataError(
     RuntimeError
@@ -75,19 +82,26 @@ class CoinGeckoEarlyMovementScannerMarketProvider:
         EarlyMovementScannerMarketAsset,
         ...,
     ]:
-        response = self._request_get(
-            self.MARKETS_URL,
-            params={
-                "vs_currency": "usd",
-                "order": "market_cap_desc",
-                "per_page": self._asset_limit,
-                "page": 1,
-                "sparkline": "false",
-                "price_change_percentage": "24h",
-            },
-            headers=self._request_config.headers,
-            timeout=self._timeout,
-        )
+        try:
+            response = coingecko_request_coordinator.execute(
+                lambda: self._request_get(
+                    self.MARKETS_URL,
+                    params={
+                        "vs_currency": "usd",
+                        "order": "market_cap_desc",
+                        "per_page": self._asset_limit,
+                        "page": 1,
+                        "sparkline": "false",
+                        "price_change_percentage": "24h",
+                    },
+                    headers=self._request_config.headers,
+                    timeout=self._timeout,
+                )
+            )
+        except CoinGeckoRequestBlocked as error:
+            raise EarlyMovementScannerDataError(
+                "Limite temporário da CoinGecko atingido."
+            ) from error
 
         self._validate_response(
             response,

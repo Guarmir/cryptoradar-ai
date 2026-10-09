@@ -188,3 +188,36 @@ def test_asset_limit_cannot_exceed_coingecko_page_limit() -> None:
         CoinGeckoEarlyMovementScannerMarketProvider(
             asset_limit=251,
         )
+
+def test_fetch_handles_coordinator_rate_limit(
+    monkeypatch,
+) -> None:
+    from app.services.coingecko_request_coordinator import (
+        CoinGeckoRequestBlocked,
+    )
+    from app.early_movement.scanner import (
+        coingecko_scanner_market_provider,
+    )
+
+    def blocked_request(*args, **kwargs):
+        raise CoinGeckoRequestBlocked(
+            "Limite de requisições atingido."
+        )
+
+    monkeypatch.setattr(
+        coingecko_scanner_market_provider.coingecko_request_coordinator,
+        "execute",
+        blocked_request,
+    )
+
+    provider = CoinGeckoEarlyMovementScannerMarketProvider(
+        request_get=lambda *args, **kwargs: pytest.fail(
+            "A requisição HTTP não deveria ser executada."
+        ),
+    )
+
+    with pytest.raises(
+        EarlyMovementScannerDataError,
+        match="Limite temporário",
+    ):
+        provider.fetch()

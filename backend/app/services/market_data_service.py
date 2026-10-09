@@ -6,6 +6,13 @@ from fastapi import HTTPException
 from app.services.chart_request_cooldown import (
     ChartRequestCooldown,
 )
+from app.services.coingecko_request_runtime import (
+    coingecko_request_coordinator,
+)
+
+from app.services.coingecko_request_coordinator import (
+    CoinGeckoRequestBlocked,
+)
 from app.services.chart_data_cache import (
     ChartDataCache,
 )
@@ -81,9 +88,11 @@ chart_request_cooldown = (
 chart_client = CoinGeckoChartClient(
     api_base_url=COINGECKO_API,
     request_get=lambda *args, **kwargs: (
-        requests.get(
-            *args,
-            **kwargs,
+        coingecko_request_coordinator.execute(
+            lambda: requests.get(
+                *args,
+                **kwargs,
+            )
         )
     ),
 )
@@ -138,9 +147,11 @@ def get_coin_list():
     url = f"{COINGECKO_API}/coins/list"
 
     try:
-        response = requests.get(
-            url,
-            timeout=20,
+        response = coingecko_request_coordinator.execute(
+            lambda: requests.get(
+              url,
+              timeout=20,
+            )
         )
 
         if response.status_code != 200:
@@ -163,6 +174,20 @@ def get_coin_list():
 
     except HTTPException:
         raise
+
+    except CoinGeckoRequestBlocked as error:
+        logger.warning(
+            "CoinGecko coin list blocked: status_code=429 reason=%s",
+            error,
+        )
+
+        if cached is not None:
+            return cached
+
+        raise HTTPException(
+            status_code=503,
+            detail="Lista de moedas temporariamente indisponível.",
+        ) from error
 
     except Exception as error:
         raise HTTPException(
@@ -289,10 +314,12 @@ def get_market_data_batch(
     }
 
     try:
-        response = requests.get(
-            url,
-            params=params,
-            timeout=20,
+        response = coingecko_request_coordinator.execute(
+            lambda: requests.get(
+                url,
+                params=params,
+                timeout=20,
+            )
         )
 
         if response.status_code != 200:
@@ -375,10 +402,12 @@ def get_market_data(
     }
 
     try:
-        response = requests.get(
-            url,
-            params=params,
-            timeout=20,
+        response = coingecko_request_coordinator.execute(
+            lambda: requests.get(
+               url,
+               params=params,
+               timeout=20,
+            )
         )
 
         if response.status_code != 200:
@@ -405,6 +434,15 @@ def get_market_data(
         )
 
         return market
+
+    except CoinGeckoRequestBlocked as error:
+        logger.warning(
+            "CoinGecko market request blocked: "
+            "coin_id=%s status_code=429 reason=%s",
+            coin_id,
+            error,
+        )
+        return stale_market
 
     except Exception:
         return stale_market
@@ -459,6 +497,21 @@ def get_chart_data(
         )
 
         return data
+
+    except CoinGeckoRequestBlocked as error:
+        chart_request_cooldown.activate()
+
+        logger.warning(
+            "CoinGecko chart request blocked: "
+            "coin_id=%s days=%s status_code=429 reason=%s",
+            coin_id,
+            days,
+            error,
+        )
+
+        return stale_chart or {
+            "prices": [],
+        }
 
     except CoinGeckoChartRequestError as exc:
         if exc.status_code == 429:

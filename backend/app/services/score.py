@@ -1,5 +1,11 @@
 import time
 import requests
+from app.services.coingecko_controlled_request import (
+    coingecko_controlled_get,
+)
+from app.services.coingecko_request_coordinator import (
+    CoinGeckoRequestBlocked,
+)
 
 CACHE = {}
 CACHE_TTL = 300  # 5 minutos
@@ -56,12 +62,16 @@ def resolve_coin(query: str):
           "name": None,
     }
 
-    response = requests.get(
-        COINGECKO_SEARCH_URL,
-        params={"query": query},
-        headers=DEFAULT_HEADERS,
-        timeout=10,
-    )
+    try:
+        response = coingecko_controlled_get(
+            COINGECKO_SEARCH_URL,
+            params={"query": query},
+            headers=DEFAULT_HEADERS,
+            timeout=10,
+        )
+
+    except CoinGeckoRequestBlocked:
+        return None
 
     if response.status_code == 429:
         return None
@@ -117,7 +127,7 @@ def calculate_score(coin_query: str):
 
         coin_id = resolved["id"]
 
-        market_response = requests.get(
+        market_response = coingecko_controlled_get(
             COINGECKO_MARKETS_URL,
             params={
                 "vs_currency": "usd",

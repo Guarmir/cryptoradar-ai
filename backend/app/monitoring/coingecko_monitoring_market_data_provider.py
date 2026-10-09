@@ -9,6 +9,12 @@ from app.monitoring.monitoring_target import MonitoringTarget
 from app.services.coingecko_request_config import (
     CoinGeckoRequestConfig,
 )
+from app.services.coingecko_request_coordinator import (
+    CoinGeckoRequestBlocked,
+)
+from app.services.coingecko_request_runtime import (
+    coingecko_request_coordinator,
+)
 
 
 class MonitoringMarketDataError(RuntimeError):
@@ -48,6 +54,26 @@ class CoinGeckoMonitoringMarketDataProvider(
         )
         self._resolved_coin_ids: dict[str, str] = {}
 
+    def _controlled_get(
+        self,
+        url: str,
+        *,
+        params: dict,
+    ) -> Any:
+        try:
+            return coingecko_request_coordinator.execute(
+                lambda: self._request_get(
+                    url,
+                    params=params,
+                    headers=self._request_config.headers,
+                    timeout=self._timeout,
+                )
+            )
+        except CoinGeckoRequestBlocked as error:
+            raise MonitoringMarketDataError(
+                "Limite temporário da CoinGecko atingido."
+            ) from error
+
     def fetch_market_data_batch(
         self,
         targets: list[MonitoringTarget],
@@ -78,17 +104,13 @@ class CoinGeckoMonitoringMarketDataProvider(
                 coin_id,
             )
 
-        response = self._request_get(
+        response = self._controlled_get(
             self.MARKETS_URL,
             params={
                 "vs_currency": "usd",
-                "ids": ",".join(
-                    coin_ids
-                ),
+                "ids": ",".join(coin_ids),
                 "price_change_percentage": "24h",
             },
-            headers=self._request_config.headers,
-            timeout=self._timeout,
         )
 
         self._validate_response(
@@ -143,15 +165,13 @@ class CoinGeckoMonitoringMarketDataProvider(
             target,
         )
 
-        response = self._request_get(
+        response = self._controlled_get(
             self.MARKETS_URL,
             params={
                 "vs_currency": "usd",
                 "ids": coin_id,
                 "price_change_percentage": "24h",
             },
-            headers=self._request_config.headers,
-            timeout=self._timeout,
         )
 
         self._validate_response(
@@ -209,13 +229,11 @@ class CoinGeckoMonitoringMarketDataProvider(
         self,
         symbol: str,
     ) -> str:
-        response = self._request_get(
+        response = self._controlled_get(
             self.SEARCH_URL,
             params={
                 "query": symbol,
             },
-            headers=self._request_config.headers,
-            timeout=self._timeout,
         )
 
         self._validate_response(
