@@ -108,3 +108,28 @@ def test_chart_cache_exposes_stale_data():
         )
         is stale
     )
+
+def test_empty_chart_does_not_overwrite_valid_cache():
+    cache = ChartDataCache()
+
+    valid_chart = {
+        "prices": [
+            [1000, 10.0],
+            [2000, 11.0],
+        ],
+    }
+
+    cache.set("bitcoin", 1, valid_chart)
+    cache.set("bitcoin", 1, {"prices": []})
+
+    assert cache.get("bitcoin", 1) == valid_chart
+    assert cache.get_stale("bitcoin", 1) == valid_chart
+
+
+def test_empty_chart_is_not_cached():
+    cache = ChartDataCache()
+
+    cache.set("cardano", 1, {"prices": []})
+
+    assert cache.get("cardano", 1) is None
+    assert cache.get_stale("cardano", 1) is None
