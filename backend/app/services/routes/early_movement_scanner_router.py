@@ -17,6 +17,18 @@ from app.early_movement.scanner.scanner_runtime_status import (
 from app.early_movement.scanner.scanner_confirmation_serializer import (
     EarlyMovementScannerConfirmationSerializer,
 )
+from app.early_movement.scanner.postgresql_scanner_signal_history_store import (
+    PostgreSQLEarlyMovementScannerSignalHistoryStore,
+)
+from app.early_movement.scanner.scanner_runtime_config import (
+    EarlyMovementScannerRuntimeConfig,
+)
+from app.early_movement.scanner.scanner_runtime_factory import (
+    HISTORY_SCOPE_KEY,
+)
+from app.early_movement.scanner.scanner_signal_history_query_service import (
+    EarlyMovementScannerSignalHistoryQueryService,
+)
 
 
 def create_early_movement_scanner_router(
@@ -258,5 +270,42 @@ def create_early_movement_scanner_router(
                 runtime,
             )
         )
+    
+    @router.get("/early-movement/history")
+    def early_movement_history(
+        limit: int = 20,
+    ):
+        if not 1 <= limit <= 100:
+            raise HTTPException(
+                status_code=422,
+                detail="O limite deve estar entre 1 e 100.",
+            )
+
+        config = EarlyMovementScannerRuntimeConfig.from_environment()
+
+        if not config.database_url:
+            raise HTTPException(
+                status_code=503,
+                detail="Histórico temporariamente indisponível.",
+            )
+
+        try:
+            store = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+                database_url=config.database_url,
+                scope_key=HISTORY_SCOPE_KEY,
+            )
+
+            service = EarlyMovementScannerSignalHistoryQueryService(
+                store=store,
+            )
+
+            return service.load_recent(limit=limit)
+
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Histórico temporariamente indisponível.",
+            ) from exc
+        
 
     return router
