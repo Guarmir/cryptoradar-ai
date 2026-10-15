@@ -58,22 +58,6 @@ class FirebaseAdminPushSender(
                 ),
             )
 
-        if device.firebase_installation_id:
-            fid_result = self._send_to_destination(
-                messaging=messaging,
-                destination_type="fid",
-                destination=(
-                    device.firebase_installation_id
-                ),
-                message=message,
-            )
-
-            if fid_result.delivered:
-                return fid_result
-
-            if not fid_result.invalid_token:
-                return fid_result
-
         if device.fcm_token:
             return self._send_to_destination(
                 messaging=messaging,

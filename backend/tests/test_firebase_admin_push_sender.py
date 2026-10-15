@@ -58,9 +58,10 @@ class _FakeMessaging:
 
 
 class FirebaseAdminPushSenderTest(
-    unittest.TestCase
-):
-    def test_prefers_fid_when_available(
+        unittest.TestCase
+    ):
+    
+    def test_prefers_fcm_token_when_fid_is_available(
         self,
     ):
         messaging = _FakeMessaging()
@@ -74,9 +75,7 @@ class FirebaseAdminPushSenderTest(
             device=PushDevice(
                 installation_id="device-a",
                 fcm_token="token-a",
-                firebase_installation_id=(
-                    "firebase-a"
-                ),
+                firebase_installation_id="firebase-a",
             ),
             message=PushNotificationMessage(
                 title="CryptoRadar",
@@ -88,21 +87,18 @@ class FirebaseAdminPushSenderTest(
             result.delivered
         )
 
-        sent = (
-            messaging
-            .sent_messages[0]
-            .kwargs
-        )
+        sent = messaging.sent_messages[0].kwargs
 
         self.assertEqual(
-            sent["fid"],
-            "firebase-a",
+            sent["token"],
+            "token-a",
         )
 
         self.assertNotIn(
-            "token",
+            "fid",
             sent,
         )
+
 
     def test_falls_back_to_token_without_fid(
         self,
