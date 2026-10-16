@@ -48,6 +48,12 @@ from app.push.postgresql_push_device_store import (
 from app.push.push_delivery_service import (
     PushDeliveryService,
 )
+from app.early_movement.scanner.postgresql_scanner_notification_state_store import (
+    PostgreSQLEarlyMovementScannerNotificationStateStore,
+)
+from app.early_movement.scanner.scanner_push_evolution_guard import (
+    EarlyMovementScannerPushEvolutionGuard,
+)
 
 
 HISTORY_SCOPE_KEY = (
@@ -124,6 +130,16 @@ def build_early_movement_scanner_runtime(
                     EarlyMovementScannerPushMessageBuilder()
                 ),
                 delivery_service=delivery_service,
+                                evolution_guard=(
+                    EarlyMovementScannerPushEvolutionGuard(
+                        state_store=(
+                            PostgreSQLEarlyMovementScannerNotificationStateStore(
+                                database_url=database_url,
+                                scope_key=HISTORY_SCOPE_KEY,
+                            )
+                        ),
+                    )
+                ),
             )
         )
 

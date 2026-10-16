@@ -132,7 +132,31 @@ def test_alert_decision_limits_alert_count() -> None:
     assert decision.should_alert is True
     assert decision.results == signals[:3]
 
-def test_alert_decision_ignores_non_alertable_states() -> None:
+def test_alert_decision_accepts_relevant_observation() -> None:
+    weak_observation = FakeRankedResult(
+        relevance_score=69.9,
+        state=EarlyMovementState.OBSERVATION,
+    )
+
+    strong_observation = FakeRankedResult(
+        relevance_score=70.0,
+        state=EarlyMovementState.OBSERVATION,
+    )
+
+    decision_maker = EarlyMovementScannerAlertDecisionMaker()
+
+    decision = decision_maker.decide(
+        make_scan_result(
+            weak_observation,
+            strong_observation,
+        )
+    )
+
+    assert decision.should_alert is True
+    assert decision.results == (strong_observation,)
+
+
+def test_alert_decision_ignores_normal_state() -> None:
     normal = FakeRankedResult(
         relevance_score=100.0,
         state=EarlyMovementState.NORMAL,
@@ -153,9 +177,7 @@ def test_alert_decision_ignores_non_alertable_states() -> None:
         state=EarlyMovementState.CONFIRMED_MOVEMENT,
     )
 
-    decision_maker = (
-        EarlyMovementScannerAlertDecisionMaker()
-    )
+    decision_maker = EarlyMovementScannerAlertDecisionMaker()
 
     decision = decision_maker.decide(
         make_scan_result(
@@ -167,8 +189,8 @@ def test_alert_decision_ignores_non_alertable_states() -> None:
     )
 
     assert decision.should_alert is True
-
     assert decision.results == (
+        observation,
         early_movement,
         confirmed_movement,
     )
