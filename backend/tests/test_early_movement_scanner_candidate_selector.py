@@ -246,6 +246,14 @@ def test_selector_excludes_stablecoins_before_candidate_limit() -> None:
             change_24h=12.0,
             rank=40,
         ),
+        _asset(
+            coin_id="usd1-wlfi",
+            symbol="USD1",
+            total_volume=8_000_000_000,
+            market_cap=3_000_000_000,
+            change_24h=0.01,
+            rank=25,
+        ),
     )
 
     result = selector.select(
@@ -267,3 +275,4 @@ def test_selector_excludes_stablecoins_before_candidate_limit() -> None:
 
     assert "tether" not in selected_coin_ids
     assert "usd-coin" not in selected_coin_ids
+    assert "usd1-wlfi" not in selected_coin_ids
