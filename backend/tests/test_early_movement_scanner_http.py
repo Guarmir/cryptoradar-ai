@@ -283,3 +283,70 @@ def test_early_movement_status_reaches_http() -> None:
     assert "interval_seconds" in body
     assert "last_cycle_available" in body
     assert "last_scheduler_error" in body
+
+    
+def test_early_movement_status_exposes_chart_diagnostics(
+    monkeypatch,
+) -> None:
+    from datetime import datetime, timezone
+
+    from app.early_movement.scanner.scanner_chart_loader import (
+        ScannerChartLoaderStats,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    stats = ScannerChartLoaderStats(
+        cache_hits=3,
+        acquisition_attempts=4,
+        budget_exhausted=13,
+        empty_results=1,
+    )
+
+    cycle_result = SimpleNamespace(
+        started_at=now,
+        finished_at=now,
+        signal_count=2,
+        should_alert=True,
+        push_results=(),
+        delivered_push_count=0,
+        chart_loader_stats=stats,
+    )
+
+    scheduler = SimpleNamespace(
+        last_cycle_result=cycle_result,
+        interval_seconds=600,
+        last_scheduler_error=None,
+    )
+
+    runtime = SimpleNamespace(
+        scheduler=scheduler,
+        is_running=True,
+    )
+
+    monkeypatch.setattr(
+        app.state,
+        "early_movement_scanner_runtime",
+        runtime,
+        raising=False,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/early-movement/status",
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["enabled"] is True
+    assert body["last_cycle_available"] is True
+
+    assert body["last_cycle"]["chart_diagnostics"] == {
+        "cache_hits": 3,
+        "acquisition_attempts": 4,
+        "budget_exhausted": 13,
+        "empty_results": 1,
+    }
