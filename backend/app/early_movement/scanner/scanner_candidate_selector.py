@@ -1,3 +1,4 @@
+
 from typing import Iterable
 
 from app.early_movement.liquidity import (
@@ -18,26 +19,24 @@ class EarlyMovementScannerCandidateSelector:
     DEFAULT_MINIMUM_LIQUIDITY_SCORE = 50.0
     DEFAULT_CANDIDATE_LIMIT = 20
 
+    # Evita premiar indefinidamente movimentos
+    # de 24h que já podem estar muito avançados.
+    MAX_ACTIVITY_PRIORITY = 5.0
+
     def __init__(
         self,
         *,
         liquidity_evaluator: (
-            EarlyMovementLiquidityEvaluator
-            | None
+            EarlyMovementLiquidityEvaluator | None
         ) = None,
         asset_eligibility_filter: (
-            EarlyMovementScannerAssetEligibilityFilter
-            | None
+            EarlyMovementScannerAssetEligibilityFilter | None
         ) = None,
         minimum_liquidity_score: float = (
             DEFAULT_MINIMUM_LIQUIDITY_SCORE
         ),
     ) -> None:
-        if not (
-            0.0
-            <= minimum_liquidity_score
-            <= 100.0
-        ):
+        if not 0.0 <= minimum_liquidity_score <= 100.0:
             raise ValueError(
                 "O score mínimo de liquidez deve "
                 "ficar entre 0 e 100."
@@ -47,27 +46,20 @@ class EarlyMovementScannerCandidateSelector:
             liquidity_evaluator
             or EarlyMovementLiquidityEvaluator()
         )
-
         self._asset_eligibility_filter = (
             asset_eligibility_filter
             or EarlyMovementScannerAssetEligibilityFilter()
         )
-
         self._minimum_liquidity_score = (
             minimum_liquidity_score
         )
 
     def select(
         self,
-        assets: Iterable[
-            EarlyMovementScannerMarketAsset
-        ],
+        assets: Iterable[EarlyMovementScannerMarketAsset],
         *,
         limit: int = DEFAULT_CANDIDATE_LIMIT,
-    ) -> tuple[
-        EarlyMovementScannerCandidate,
-        ...,
-    ]:
+    ) -> tuple[EarlyMovementScannerCandidate, ...]:
         if limit < 1:
             raise ValueError(
                 "O limite de candidatos deve ser "
@@ -79,23 +71,16 @@ class EarlyMovementScannerCandidateSelector:
         ] = []
 
         for asset in assets:
-            if not (
-                self._asset_eligibility_filter
-                .is_eligible(asset)
+            if not self._asset_eligibility_filter.is_eligible(
+                asset
             ):
                 continue
 
-            liquidity = (
-                self._liquidity_evaluator.evaluate(
-                    {
-                        "total_volume": (
-                            asset.total_volume
-                        ),
-                        "market_cap": (
-                            asset.market_cap
-                        ),
-                    }
-                )
+            liquidity = self._liquidity_evaluator.evaluate(
+                {
+                    "total_volume": asset.total_volume,
+                    "market_cap": asset.market_cap,
+                }
             )
 
             if not liquidity.available:
@@ -104,10 +89,7 @@ class EarlyMovementScannerCandidateSelector:
             if liquidity.score is None:
                 continue
 
-            if (
-                liquidity.score
-                < self._minimum_liquidity_score
-            ):
+            if liquidity.score < self._minimum_liquidity_score:
                 continue
 
             candidates.append(
@@ -117,52 +99,38 @@ class EarlyMovementScannerCandidateSelector:
                 )
             )
 
-        candidates.sort(
-            key=self._sort_key,
-        )
+        candidates.sort(key=self._sort_key)
 
-        return tuple(
-            candidates[:limit]
-        )
+        return tuple(candidates[:limit])
 
     @staticmethod
     def _sort_key(
         candidate: EarlyMovementScannerCandidate,
-    ) -> tuple[
-        float,
-        float,
-        int,
-        str,
-    ]:
-        liquidity_score = (
-            candidate.liquidity.score
-            or 0.0
-        )
+    ) -> tuple[float, float, int, str]:
+        liquidity_score = candidate.liquidity.score or 0.0
 
         change_24h = (
-            candidate
-            .asset
-            .price_change_percentage_24h
+            candidate.asset.price_change_percentage_24h
         )
 
         movement_activity = abs(
-            change_24h
-            if change_24h is not None
-            else 0.0
+            change_24h if change_24h is not None else 0.0
+        )
+
+        activity_priority = min(
+            movement_activity,
+            EarlyMovementScannerCandidateSelector.MAX_ACTIVITY_PRIORITY,
         )
 
         market_cap_rank = (
             candidate.asset.market_cap_rank
-            if (
-                candidate.asset.market_cap_rank
-                is not None
-            )
+            if candidate.asset.market_cap_rank is not None
             else 1_000_000
         )
 
         return (
+            -activity_priority,
             -liquidity_score,
-            -movement_activity,
             market_cap_rank,
             candidate.coin_id,
         )

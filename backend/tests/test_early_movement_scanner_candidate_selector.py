@@ -1,3 +1,4 @@
+
 import pytest
 
 from app.early_movement.scanner import (
@@ -28,9 +29,7 @@ def _asset(
 
 
 def test_selector_removes_low_liquidity_assets() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
-    )
+    selector = EarlyMovementScannerCandidateSelector()
 
     assets = (
         _asset(
@@ -51,28 +50,16 @@ def test_selector_removes_low_liquidity_assets() -> None:
         ),
     )
 
-    result = selector.select(
-        assets,
-    )
+    result = selector.select(assets)
 
     assert len(result) == 1
     assert result[0].coin_id == "liquid"
-
-    assert (
-        result[0].liquidity.score
-        is not None
-    )
-
-    assert (
-        result[0].liquidity.score
-        >= 50.0
-    )
+    assert result[0].liquidity.score is not None
+    assert result[0].liquidity.score >= 50.0
 
 
-def test_selector_prioritizes_higher_liquidity() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
-    )
+def test_selector_considers_activity_before_liquidity() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
 
     assets = (
         _asset(
@@ -80,7 +67,7 @@ def test_selector_prioritizes_higher_liquidity() -> None:
             symbol="med",
             total_volume=60_000_000,
             market_cap=3_000_000_000,
-            change_24h=8.0,
+            change_24h=4.0,
             rank=40,
         ),
         _asset(
@@ -93,19 +80,15 @@ def test_selector_prioritizes_higher_liquidity() -> None:
         ),
     )
 
-    result = selector.select(
-        assets,
-    )
+    result = selector.select(assets)
 
     assert len(result) == 2
-    assert result[0].coin_id == "strong"
-    assert result[1].coin_id == "medium"
+    assert result[0].coin_id == "medium"
+    assert result[1].coin_id == "strong"
 
 
 def test_equal_liquidity_uses_absolute_price_change() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
-    )
+    selector = EarlyMovementScannerCandidateSelector()
 
     assets = (
         _asset(
@@ -121,23 +104,46 @@ def test_equal_liquidity_uses_absolute_price_change() -> None:
             symbol="act",
             total_volume=500_000_000,
             market_cap=5_000_000_000,
-            change_24h=-6.0,
+            change_24h=-4.0,
             rank=30,
         ),
     )
 
-    result = selector.select(
-        assets,
-    )
+    result = selector.select(assets)
 
     assert result[0].coin_id == "active"
     assert result[1].coin_id == "quiet"
 
 
-def test_equal_liquidity_and_change_use_market_cap_rank() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
+def test_large_past_move_does_not_dominate_indefinitely() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
+
+    assets = (
+        _asset(
+            coin_id="already-surged",
+            symbol="sur",
+            total_volume=100_000_000,
+            market_cap=3_000_000_000,
+            change_24h=45.0,
+            rank=30,
+        ),
+        _asset(
+            coin_id="active-liquid",
+            symbol="act",
+            total_volume=500_000_000,
+            market_cap=5_000_000_000,
+            change_24h=5.0,
+            rank=20,
+        ),
     )
+
+    result = selector.select(assets)
+
+    assert result[0].coin_id == "active-liquid"
+
+
+def test_equal_liquidity_and_change_use_market_cap_rank() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
 
     assets = (
         _asset(
@@ -158,18 +164,14 @@ def test_equal_liquidity_and_change_use_market_cap_rank() -> None:
         ),
     )
 
-    result = selector.select(
-        assets,
-    )
+    result = selector.select(assets)
 
     assert result[0].coin_id == "rank-five"
     assert result[1].coin_id == "rank-twenty"
 
 
 def test_selector_respects_candidate_limit() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
-    )
+    selector = EarlyMovementScannerCandidateSelector()
 
     assets = tuple(
         _asset(
@@ -180,38 +182,23 @@ def test_selector_respects_candidate_limit() -> None:
             change_24h=float(index),
             rank=index,
         )
-        for index in range(
-            1,
-            6,
-        )
+        for index in range(1, 6)
     )
 
-    result = selector.select(
-        assets,
-        limit=3,
-    )
+    result = selector.select(assets, limit=3)
 
     assert len(result) == 3
 
 
 def test_selector_rejects_invalid_limit() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
-    )
+    selector = EarlyMovementScannerCandidateSelector()
 
-    with pytest.raises(
-        ValueError,
-        match="maior que zero",
-    ):
-        selector.select(
-            (),
-            limit=0,
-        )
+    with pytest.raises(ValueError, match="maior que zero"):
+        selector.select((), limit=0)
+
 
 def test_selector_excludes_stablecoins_before_candidate_limit() -> None:
-    selector = (
-        EarlyMovementScannerCandidateSelector()
-    )
+    selector = EarlyMovementScannerCandidateSelector()
 
     assets = (
         _asset(
@@ -256,16 +243,12 @@ def test_selector_excludes_stablecoins_before_candidate_limit() -> None:
         ),
     )
 
-    result = selector.select(
-        assets,
-        limit=2,
-    )
+    result = selector.select(assets, limit=2)
 
     assert len(result) == 2
 
     selected_coin_ids = {
-        candidate.coin_id
-        for candidate in result
+        candidate.coin_id for candidate in result
     }
 
     assert selected_coin_ids == {
