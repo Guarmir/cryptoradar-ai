@@ -161,6 +161,9 @@ def build_early_movement_scanner_runtime(
             on_cycle_start=(
                 scanner_chart_loader.reset_budget
             ),
+            chart_stats_provider=(
+                lambda: scanner_chart_loader.stats
+            ),
     alert_decision_maker=(
         EarlyMovementScannerAlertDecisionMaker(
             enable_early_observation=(
