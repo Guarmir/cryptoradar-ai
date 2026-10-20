@@ -1,3 +1,4 @@
+
 from typing import Any, Optional
 
 from app.early_movement.scanner.scanner_runtime import (
@@ -40,7 +41,7 @@ def build_early_movement_scanner_runtime_status(
     }
 
     if last_cycle_result is not None:
-        status["last_cycle"] = {
+        last_cycle: dict[str, Any] = {
             "started_at": (
                 last_cycle_result
                 .started_at
@@ -67,5 +68,29 @@ def build_early_movement_scanner_runtime_status(
                 .delivered_push_count
             ),
         }
+
+        chart_stats = getattr(
+            last_cycle_result,
+            "chart_loader_stats",
+            None,
+        )
+
+        if chart_stats is not None:
+            last_cycle["chart_diagnostics"] = {
+                "cache_hits": (
+                    chart_stats.cache_hits
+                ),
+                "acquisition_attempts": (
+                    chart_stats.acquisition_attempts
+                ),
+                "budget_exhausted": (
+                    chart_stats.budget_exhausted
+                ),
+                "empty_results": (
+                    chart_stats.empty_results
+                ),
+            }
+
+        status["last_cycle"] = last_cycle
 
     return status
