@@ -221,3 +221,45 @@ def test_fetch_handles_coordinator_rate_limit(
         match="Limite temporário",
     ):
         provider.fetch()
+
+        
+def test_default_fetch_requests_250_assets() -> None:
+    captured = {}
+
+    def fake_get(
+        url,
+        *,
+        params,
+        headers,
+        timeout,
+    ):
+        captured["params"] = params
+
+        return FakeResponse(
+            status_code=200,
+            payload=[
+                {
+                    "id": "bitcoin",
+                    "symbol": "btc",
+                    "name": "Bitcoin",
+                    "current_price": 65000,
+                    "market_cap": 1_200_000_000_000,
+                    "total_volume": 30_000_000_000,
+                    "price_change_percentage_24h": 2.5,
+                    "market_cap_rank": 1,
+                }
+            ],
+        )
+
+    provider = (
+        CoinGeckoEarlyMovementScannerMarketProvider(
+            request_get=fake_get,
+        )
+    )
+
+    result = provider.fetch()
+
+    assert len(result) == 1
+    assert captured["params"]["per_page"] == 250
+    assert captured["params"]["page"] == 1
+    assert captured["params"]["order"] == "market_cap_desc"

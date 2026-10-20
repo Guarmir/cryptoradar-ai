@@ -41,7 +41,7 @@ class CoinGeckoEarlyMovementScannerMarketProvider:
         self,
         *,
         timeout: int = 10,
-        asset_limit: int = 100,
+        asset_limit: int = 250,
         request_get: Optional[
             Callable[..., Any]
         ] = None,
