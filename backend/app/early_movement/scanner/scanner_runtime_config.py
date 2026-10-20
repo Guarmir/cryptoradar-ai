@@ -1,3 +1,4 @@
+
 import os
 from dataclasses import dataclass
 from typing import Mapping, Optional
@@ -13,6 +14,10 @@ EARLY_MOVEMENT_SCANNER_INTERVAL_ENV = (
 
 EARLY_MOVEMENT_SCANNER_PUSH_ENABLED_ENV = (
     "CRYPTORADAR_EARLY_MOVEMENT_SCANNER_PUSH_ENABLED"
+)
+
+EARLY_MOVEMENT_SCANNER_EARLY_OBSERVATION_ENABLED_ENV = (
+    "CRYPTORADAR_EARLY_MOVEMENT_SCANNER_EARLY_OBSERVATION_ENABLED"
 )
 
 EARLY_MOVEMENT_SCANNER_PUSH_COOLDOWN_ENV = (
@@ -35,6 +40,8 @@ class EarlyMovementScannerRuntimeConfig:
 
     push_enabled: bool = False
     push_cooldown_seconds: float = 3600.0
+
+    early_observation_enabled: bool = False
 
     database_url: Optional[str] = None
     push_scope_key: Optional[str] = None
@@ -98,7 +105,7 @@ class EarlyMovementScannerRuntimeConfig:
                 source.get(
                     EARLY_MOVEMENT_SCANNER_INTERVAL_ENV,
                 ),
-               default=300.0,
+                default=300.0,
                 environment_name=(
                     EARLY_MOVEMENT_SCANNER_INTERVAL_ENV
                 ),
@@ -111,6 +118,15 @@ class EarlyMovementScannerRuntimeConfig:
             ),
             environment_name=(
                 EARLY_MOVEMENT_SCANNER_PUSH_ENABLED_ENV
+            ),
+        )
+
+        early_observation_enabled = _parse_enabled(
+            source.get(
+                EARLY_MOVEMENT_SCANNER_EARLY_OBSERVATION_ENABLED_ENV,
+            ),
+            environment_name=(
+                EARLY_MOVEMENT_SCANNER_EARLY_OBSERVATION_ENABLED_ENV
             ),
         )
 
@@ -144,6 +160,9 @@ class EarlyMovementScannerRuntimeConfig:
             push_enabled=push_enabled,
             push_cooldown_seconds=(
                 push_cooldown_seconds
+            ),
+            early_observation_enabled=(
+                early_observation_enabled
             ),
             database_url=database_url,
             push_scope_key=push_scope_key,

@@ -161,9 +161,13 @@ def build_early_movement_scanner_runtime(
             on_cycle_start=(
                 scanner_chart_loader.reset_budget
             ),
-            alert_decision_maker=(
-                EarlyMovementScannerAlertDecisionMaker()
+    alert_decision_maker=(
+        EarlyMovementScannerAlertDecisionMaker(
+            enable_early_observation=(
+                config.early_observation_enabled
             ),
+        )
+    ),
             history_service=history_service,
             push_service=push_service,
         )

@@ -194,3 +194,69 @@ def test_alert_decision_ignores_normal_state() -> None:
         early_movement,
         confirmed_movement,
     )
+
+    
+from types import SimpleNamespace
+
+from app.early_movement.early_movement_evidence import (
+    EarlyMovementEvidence,
+)
+
+
+def make_observation_with_evidence(
+    *,
+    price_acceleration: float,
+    false_breakout_risk: float = 40.0,
+):
+    evidence = EarlyMovementEvidence(
+        state=EarlyMovementState.OBSERVATION,
+        price_acceleration=price_acceleration,
+        abnormal_volume_ratio=1.10,
+        liquidity_score=70.0,
+        volatility_expansion=1.20,
+        support_break=True,
+        persistence_score=55.0,
+        false_breakout_risk=false_breakout_risk,
+    )
+
+    return SimpleNamespace(
+        relevance_score=55.0,
+        state=EarlyMovementState.OBSERVATION,
+        result=SimpleNamespace(
+            analysis=SimpleNamespace(
+                evidence=evidence,
+            ),
+        ),
+    )
+
+
+def test_early_observation_enabled_accepts_relevant_signal() -> None:
+    signal = make_observation_with_evidence(
+        price_acceleration=-0.80,
+    )
+
+    decision_maker = EarlyMovementScannerAlertDecisionMaker(
+        enable_early_observation=True,
+    )
+
+    decision = decision_maker.decide(
+        make_scan_result(signal)
+    )
+
+    assert decision.should_alert is True
+    assert decision.results == (signal,)
+
+
+def test_early_observation_disabled_preserves_previous_rule() -> None:
+    signal = make_observation_with_evidence(
+        price_acceleration=-0.80,
+    )
+
+    decision_maker = EarlyMovementScannerAlertDecisionMaker()
+
+    decision = decision_maker.decide(
+        make_scan_result(signal)
+    )
+
+    assert decision.should_alert is False
+    assert decision.results == ()
