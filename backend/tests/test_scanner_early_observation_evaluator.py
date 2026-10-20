@@ -44,10 +44,47 @@ def test_accepts_relevant_upward_observation() -> None:
     assert evaluator.is_relevant(evidence) is True
 
 
-def test_rejects_opposite_breakout_direction() -> None:
+def test_accepts_downward_breakout_with_positive_acceleration() -> None:
     evaluator = EarlyMovementScannerEarlyObservationEvaluator()
 
-    evidence = make_evidence(price_acceleration=0.8)
+    evidence = make_evidence(
+        price_acceleration=0.8,
+        support_break=True,
+        resistance_break=False,
+    )
+
+    assert evaluator.is_relevant(evidence) is True
+
+
+def test_accepts_upward_breakout_with_negative_acceleration() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=-0.8,
+        support_break=False,
+        resistance_break=True,
+    )
+
+    assert evaluator.is_relevant(evidence) is True
+
+
+def test_rejects_simultaneous_opposite_breakouts() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        support_break=True,
+        resistance_break=True,
+    )
+
+    assert evaluator.is_relevant(evidence) is False
+
+
+def test_rejects_insufficient_acceleration() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=0.3,
+    )
 
     assert evaluator.is_relevant(evidence) is False
 
@@ -55,7 +92,9 @@ def test_rejects_opposite_breakout_direction() -> None:
 def test_rejects_excessive_false_breakout_risk() -> None:
     evaluator = EarlyMovementScannerEarlyObservationEvaluator()
 
-    evidence = make_evidence(false_breakout_risk=70.0)
+    evidence = make_evidence(
+        false_breakout_risk=70.0,
+    )
 
     assert evaluator.is_relevant(evidence) is False
 
@@ -63,7 +102,9 @@ def test_rejects_excessive_false_breakout_risk() -> None:
 def test_rejects_insufficient_liquidity() -> None:
     evaluator = EarlyMovementScannerEarlyObservationEvaluator()
 
-    evidence = make_evidence(liquidity_score=30.0)
+    evidence = make_evidence(
+        liquidity_score=30.0,
+    )
 
     assert evaluator.is_relevant(evidence) is False
 
@@ -71,7 +112,9 @@ def test_rejects_insufficient_liquidity() -> None:
 def test_rejects_missing_essential_information() -> None:
     evaluator = EarlyMovementScannerEarlyObservationEvaluator()
 
-    evidence = make_evidence(abnormal_volume_ratio=None)
+    evidence = make_evidence(
+        abnormal_volume_ratio=None,
+    )
 
     assert evaluator.is_relevant(evidence) is False
 

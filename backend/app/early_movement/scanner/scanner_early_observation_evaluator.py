@@ -49,21 +49,12 @@ class EarlyMovementScannerEarlyObservationEvaluator:
         ):
             return False
 
+        # A aceleracao mede a diferenca entre retornos
+        # consecutivos, nao a direcao absoluta do preco.
+        # Seu sinal nao deve invalidar um rompimento.
         if (
             evidence.support_break
             and evidence.resistance_break
-        ):
-            return False
-
-        if (
-            evidence.support_break
-            and acceleration >= 0
-        ):
-            return False
-
-        if (
-            evidence.resistance_break
-            and acceleration <= 0
         ):
             return False
 
