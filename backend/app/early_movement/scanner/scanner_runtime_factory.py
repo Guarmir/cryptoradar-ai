@@ -54,11 +54,29 @@ from app.early_movement.scanner.postgresql_scanner_notification_state_store impo
 from app.early_movement.scanner.scanner_push_evolution_guard import (
     EarlyMovementScannerPushEvolutionGuard,
 )
+import os
+
+from app.early_movement.scanner.scanner_rotation_bridge import (
+    EarlyMovementScannerRotationBridge,
+)
 
 
 HISTORY_SCOPE_KEY = (
     "early-movement-production"
 )
+
+def is_scanner_rotation_enabled() -> bool:
+    value = os.getenv(
+        "EARLY_MOVEMENT_SCANNER_ROTATION_ENABLED",
+        "false",
+    )
+
+    return value.strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def build_early_movement_scanner_runtime(
@@ -143,8 +161,24 @@ def build_early_movement_scanner_runtime(
             )
         )
 
+    rotation_bridge = None
+
+    if is_scanner_rotation_enabled():
+        rotation_bridge = (
+            EarlyMovementScannerRotationBridge(
+                acquisition_budget=4,
+                priority_slots=1,
+            )
+        )
+
     scanner_chart_loader = (
-        EarlyMovementScannerChartLoader()
+        EarlyMovementScannerChartLoader(
+            on_chart_result=(
+                rotation_bridge.on_chart_result
+                if rotation_bridge is not None
+                else None
+            ),
+        )
     )
 
     scanner = EarlyMovementScanner(
@@ -152,6 +186,11 @@ def build_early_movement_scanner_runtime(
             EarlyMovementScannerDeepAnalyzer(
                 chart_loader=scanner_chart_loader,
             )
+        ),
+        candidate_arranger=(
+            rotation_bridge.arrange
+            if rotation_bridge is not None
+            else None
         ),
     )
 

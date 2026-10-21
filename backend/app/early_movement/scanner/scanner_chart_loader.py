@@ -19,6 +19,11 @@ CacheLoader = Callable[
     Mapping[str, Any] | None,
 ]
 
+ChartResultCallback = Callable[
+    [str, bool],
+    None,
+]
+
 
 @dataclass(frozen=True)
 class ScannerChartLoaderStats:
@@ -37,21 +42,44 @@ class EarlyMovementScannerChartLoader:
         chart_loader: ChartLoader = get_chart_data,
         cache_loader: CacheLoader = get_cached_chart_data,
         request_budget: int = DEFAULT_REQUEST_BUDGET,
+        on_chart_result: ChartResultCallback | None = None,
     ) -> None:
         if request_budget < 1:
             raise ValueError(
-                "O orçamento de aquisições deve ser "
-                "maior que zero."
+                "O orçamento deve ser maior que zero."
             )
 
         self._chart_loader = chart_loader
         self._cache_loader = cache_loader
         self._request_budget = request_budget
+        self._on_chart_result = on_chart_result
 
         self._request_count = 0
         self._cache_hits = 0
         self._budget_exhausted = 0
         self._empty_results = 0
+
+    @staticmethod
+    def _has_prices(
+        data: Mapping[str, Any],
+    ) -> bool:
+        prices = data.get("prices")
+
+        return (
+            isinstance(prices, (list, tuple))
+            and len(prices) > 0
+        )
+
+    def _notify(
+        self,
+        coin_id: str,
+        success: bool,
+    ) -> None:
+        if self._on_chart_result is not None:
+            self._on_chart_result(
+                coin_id,
+                success,
+            )
 
     def __call__(
         self,
@@ -65,6 +93,12 @@ class EarlyMovementScannerChartLoader:
 
         if cached is not None:
             self._cache_hits += 1
+
+            self._notify(
+                coin_id,
+                self._has_prices(cached),
+            )
+
             return cached
 
         if self._request_count >= self._request_budget:
@@ -73,15 +107,30 @@ class EarlyMovementScannerChartLoader:
 
         self._request_count += 1
 
-        result = self._chart_loader(
-            coin_id,
-            days,
-        )
-
-        prices = result.get("prices")
-
-        if not isinstance(prices, list) or not prices:
+        try:
+            result = self._chart_loader(
+                coin_id,
+                days,
+            )
+        except Exception:
             self._empty_results += 1
+            self._notify(coin_id, False)
+            raise
+
+        if not isinstance(result, Mapping):
+            self._empty_results += 1
+            self._notify(coin_id, False)
+            return {"prices": []}
+
+        success = self._has_prices(result)
+
+        if not success:
+            self._empty_results += 1
+
+        self._notify(
+            coin_id,
+            success,
+        )
 
         return result
 
