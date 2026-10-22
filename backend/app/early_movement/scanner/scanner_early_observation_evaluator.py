@@ -16,6 +16,12 @@ class EarlyMovementScannerEarlyObservationEvaluator:
     MIN_VOLUME_RATIO = 0.75
     MIN_SUPPORTING_EVIDENCES = 3
 
+    # Caminho experimental para observacoes antecipadas.
+    EARLY_MIN_PERSISTENCE_SCORE = 10.0
+    EARLY_MIN_PRICE_ACCELERATION = 1.50
+    EARLY_MIN_VOLUME_RATIO = 0.85
+    EARLY_MIN_VOLATILITY_EXPANSION = 1.50
+
     def is_relevant(
         self,
         evidence: EarlyMovementEvidence,
@@ -26,12 +32,6 @@ class EarlyMovementScannerEarlyObservationEvaluator:
         if (
             evidence.liquidity_score is None
             or evidence.liquidity_score < self.MIN_LIQUIDITY_SCORE
-        ):
-            return False
-
-        if (
-            evidence.persistence_score is None
-            or evidence.persistence_score < self.MIN_PERSISTENCE_SCORE
         ):
             return False
 
@@ -49,13 +49,7 @@ class EarlyMovementScannerEarlyObservationEvaluator:
         ):
             return False
 
-        # A aceleracao mede a diferenca entre retornos
-        # consecutivos, nao a direcao absoluta do preco.
-        # Seu sinal nao deve invalidar um rompimento.
-        if (
-            evidence.support_break
-            and evidence.resistance_break
-        ):
+        if evidence.support_break and evidence.resistance_break:
             return False
 
         volume_ratio = evidence.abnormal_volume_ratio
@@ -64,6 +58,11 @@ class EarlyMovementScannerEarlyObservationEvaluator:
             volume_ratio is None
             or volume_ratio < self.MIN_VOLUME_RATIO
         ):
+            return False
+
+        persistence = evidence.persistence_score
+
+        if persistence is None:
             return False
 
         supporting_evidences = 0
@@ -83,10 +82,31 @@ class EarlyMovementScannerEarlyObservationEvaluator:
         ):
             supporting_evidences += 1
 
-        if evidence.persistence_score >= 50.0:
+        if persistence >= 50.0:
             supporting_evidences += 1
 
-        return (
-            supporting_evidences
+        conventional_observation = (
+            persistence >= self.MIN_PERSISTENCE_SCORE
+            and supporting_evidences
             >= self.MIN_SUPPORTING_EVIDENCES
         )
+
+        if conventional_observation:
+            return True
+
+        early_observation = (
+            persistence >= self.EARLY_MIN_PERSISTENCE_SCORE
+            and abs(acceleration)
+            >= self.EARLY_MIN_PRICE_ACCELERATION
+            and volume_ratio >= self.EARLY_MIN_VOLUME_RATIO
+            and evidence.volatility_expansion is not None
+            and evidence.volatility_expansion
+            >= self.EARLY_MIN_VOLATILITY_EXPANSION
+            and (
+                evidence.support_break
+                or evidence.resistance_break
+            )
+            and evidence.retest_confirmed is True
+        )
+
+        return early_observation

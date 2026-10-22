@@ -139,3 +139,110 @@ def test_rejects_non_observation_state() -> None:
     )
 
     assert evaluator.is_relevant(evidence) is False
+
+    
+def test_accepts_early_upward_observation_with_strong_evidence() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=2.254,
+        abnormal_volume_ratio=0.907,
+        liquidity_score=70.0,
+        volatility_expansion=1.589,
+        support_break=False,
+        resistance_break=True,
+        retest_confirmed=True,
+        persistence_score=12.0,
+        false_breakout_risk=50.0,
+    )
+
+    assert evaluator.is_relevant(evidence) is True
+
+
+def test_accepts_early_downward_observation_with_strong_evidence() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=-2.0,
+        abnormal_volume_ratio=0.9,
+        volatility_expansion=1.6,
+        support_break=True,
+        resistance_break=False,
+        retest_confirmed=True,
+        persistence_score=15.0,
+    )
+
+    assert evaluator.is_relevant(evidence) is True
+
+
+def test_rejects_early_observation_without_retest() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=2.0,
+        abnormal_volume_ratio=0.9,
+        volatility_expansion=1.6,
+        persistence_score=12.0,
+        retest_confirmed=False,
+    )
+
+    assert evaluator.is_relevant(evidence) is False
+
+
+def test_rejects_early_observation_with_weak_persistence() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=2.0,
+        abnormal_volume_ratio=0.9,
+        volatility_expansion=1.6,
+        persistence_score=8.0,
+        retest_confirmed=True,
+    )
+
+    assert evaluator.is_relevant(evidence) is False
+
+
+def test_rejects_early_observation_with_insufficient_volatility() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=2.0,
+        abnormal_volume_ratio=0.9,
+        volatility_expansion=1.3,
+        persistence_score=12.0,
+        retest_confirmed=True,
+    )
+
+    assert evaluator.is_relevant(evidence) is False
+
+
+def test_rejects_early_observation_with_excessive_risk() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=2.0,
+        abnormal_volume_ratio=0.9,
+        volatility_expansion=1.6,
+        persistence_score=12.0,
+        retest_confirmed=True,
+        false_breakout_risk=60.0,
+    )
+
+    assert evaluator.is_relevant(evidence) is False
+
+
+def test_rejects_early_observation_with_low_liquidity() -> None:
+    evaluator = EarlyMovementScannerEarlyObservationEvaluator()
+
+    evidence = make_evidence(
+        price_acceleration=2.0,
+        abnormal_volume_ratio=0.9,
+        volatility_expansion=1.6,
+        persistence_score=12.0,
+        retest_confirmed=True,
+        liquidity_score=40.0,
+    )
+
+    assert evaluator.is_relevant(evidence) is False
+

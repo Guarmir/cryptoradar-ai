@@ -260,3 +260,72 @@ def test_early_observation_disabled_preserves_previous_rule() -> None:
 
     assert decision.should_alert is False
     assert decision.results == ()
+
+    
+def test_alert_decision_accepts_strong_early_observation() -> None:
+    evidence = EarlyMovementEvidence(
+        state=EarlyMovementState.OBSERVATION,
+        price_acceleration=2.254,
+        abnormal_volume_ratio=0.907,
+        liquidity_score=70.0,
+        volatility_expansion=1.589,
+        support_break=False,
+        resistance_break=True,
+        retest_confirmed=True,
+        persistence_score=12.0,
+        false_breakout_risk=50.0,
+    )
+
+    signal = SimpleNamespace(
+        relevance_score=48.1,
+        state=EarlyMovementState.OBSERVATION,
+        result=SimpleNamespace(
+            analysis=SimpleNamespace(evidence=evidence),
+        ),
+    )
+
+    decision_maker = EarlyMovementScannerAlertDecisionMaker(
+        enable_early_observation=True,
+    )
+
+    decision = decision_maker.decide(
+        make_scan_result(signal)
+    )
+
+    assert decision.should_alert is True
+    assert decision.results == (signal,)
+
+
+def test_alert_decision_blocks_strong_early_observation_when_disabled() -> None:
+    evidence = EarlyMovementEvidence(
+        state=EarlyMovementState.OBSERVATION,
+        price_acceleration=2.254,
+        abnormal_volume_ratio=0.907,
+        liquidity_score=70.0,
+        volatility_expansion=1.589,
+        support_break=False,
+        resistance_break=True,
+        retest_confirmed=True,
+        persistence_score=12.0,
+        false_breakout_risk=50.0,
+    )
+
+    signal = SimpleNamespace(
+        relevance_score=48.1,
+        state=EarlyMovementState.OBSERVATION,
+        result=SimpleNamespace(
+            analysis=SimpleNamespace(evidence=evidence),
+        ),
+    )
+
+    decision_maker = EarlyMovementScannerAlertDecisionMaker(
+        enable_early_observation=False,
+    )
+
+    decision = decision_maker.decide(
+        make_scan_result(signal)
+    )
+
+    assert decision.should_alert is False
+    assert decision.results == ()
+
