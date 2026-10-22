@@ -273,3 +273,164 @@ def test_deep_analyzer_rejects_invalid_chart_period() -> None:
         EarlyMovementScannerDeepAnalyzer(
             chart_days=0,
         )
+
+        
+def test_deep_analyzer_accepts_fresh_chart() -> None:
+    fake_analyzer = FakeAnalyzer()
+    now = 1_800_000_000.0
+
+    chart_data = {
+        "prices": [
+            [(now - 3600) * 1000, 10.0],
+            [(now - 60) * 1000, 10.5],
+        ],
+    }
+
+    deep_analyzer = EarlyMovementScannerDeepAnalyzer(
+        analyzer=fake_analyzer,
+        chart_loader=lambda coin_id, days: chart_data,
+        max_chart_age_seconds=7200,
+        clock=lambda: now,
+    )
+
+    result = deep_analyzer.analyze_candidates(
+        (_candidate("uniswap"),)
+    )
+
+    assert result[0].analysis is fake_analyzer.result
+    assert result[0].error is None
+    assert len(fake_analyzer.calls) == 1
+
+
+def test_deep_analyzer_rejects_stale_chart() -> None:
+    fake_analyzer = FakeAnalyzer()
+    now = 1_800_000_000.0
+
+    chart_data = {
+        "prices": [
+            [(now - 14400) * 1000, 10.0],
+            [(now - 10800) * 1000, 10.5],
+        ],
+    }
+
+    deep_analyzer = EarlyMovementScannerDeepAnalyzer(
+        analyzer=fake_analyzer,
+        chart_loader=lambda coin_id, days: chart_data,
+        max_chart_age_seconds=7200,
+        clock=lambda: now,
+    )
+
+    result = deep_analyzer.analyze_candidates(
+        (_candidate("uniswap"),)
+    )
+
+    assert result[0].analysis is None
+    assert result[0].error == "chart_data_stale"
+    assert fake_analyzer.calls == []
+
+
+def test_deep_analyzer_rejects_invalid_timestamps() -> None:
+    fake_analyzer = FakeAnalyzer()
+
+    chart_data = {
+        "prices": [
+            ["invalid", 10.0],
+            [None, 10.5],
+        ],
+    }
+
+    deep_analyzer = EarlyMovementScannerDeepAnalyzer(
+        analyzer=fake_analyzer,
+        chart_loader=lambda coin_id, days: chart_data,
+        max_chart_age_seconds=7200,
+        clock=lambda: 1_800_000_000.0,
+    )
+
+    result = deep_analyzer.analyze_candidates(
+        (_candidate("uniswap"),)
+    )
+
+    assert result[0].analysis is None
+    assert result[0].error == "chart_data_stale"
+    assert fake_analyzer.calls == []
+
+    
+def test_deep_analyzer_accepts_fresh_chart() -> None:
+    fake_analyzer = FakeAnalyzer()
+    now = 1_800_000_000.0
+
+    chart_data = {
+        "prices": [
+            [(now - 3600) * 1000, 10.0],
+            [(now - 60) * 1000, 10.5],
+        ],
+    }
+
+    deep_analyzer = EarlyMovementScannerDeepAnalyzer(
+        analyzer=fake_analyzer,
+        chart_loader=lambda coin_id, days: chart_data,
+        max_chart_age_seconds=7200,
+        clock=lambda: now,
+    )
+
+    result = deep_analyzer.analyze_candidates(
+        (_candidate("uniswap"),)
+    )
+
+    assert result[0].analysis is fake_analyzer.result
+    assert result[0].error is None
+    assert len(fake_analyzer.calls) == 1
+
+
+def test_deep_analyzer_rejects_stale_chart() -> None:
+    fake_analyzer = FakeAnalyzer()
+    now = 1_800_000_000.0
+
+    chart_data = {
+        "prices": [
+            [(now - 14400) * 1000, 10.0],
+            [(now - 10800) * 1000, 10.5],
+        ],
+    }
+
+    deep_analyzer = EarlyMovementScannerDeepAnalyzer(
+        analyzer=fake_analyzer,
+        chart_loader=lambda coin_id, days: chart_data,
+        max_chart_age_seconds=7200,
+        clock=lambda: now,
+    )
+
+    result = deep_analyzer.analyze_candidates(
+        (_candidate("uniswap"),)
+    )
+
+    assert result[0].analysis is None
+    assert result[0].error == "chart_data_stale"
+    assert fake_analyzer.calls == []
+
+
+def test_deep_analyzer_rejects_invalid_timestamps() -> None:
+    fake_analyzer = FakeAnalyzer()
+
+    chart_data = {
+        "prices": [
+            ["invalid", 10.0],
+            [None, 10.5],
+        ],
+    }
+
+    deep_analyzer = EarlyMovementScannerDeepAnalyzer(
+        analyzer=fake_analyzer,
+        chart_loader=lambda coin_id, days: chart_data,
+        max_chart_age_seconds=7200,
+        clock=lambda: 1_800_000_000.0,
+    )
+
+    result = deep_analyzer.analyze_candidates(
+        (_candidate("uniswap"),)
+    )
+
+    assert result[0].analysis is None
+    assert result[0].error == "chart_data_stale"
+    assert fake_analyzer.calls == []
+

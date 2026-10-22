@@ -1,3 +1,5 @@
+
+import time
 from collections.abc import (
     Callable,
     Iterable,
@@ -24,9 +26,12 @@ ChartLoader = Callable[
     Mapping[str, Any],
 ]
 
+Clock = Callable[[], float]
+
 
 class EarlyMovementScannerDeepAnalyzer:
     DEFAULT_CHART_DAYS = 7
+    DEFAULT_MAX_CHART_AGE_SECONDS = 2 * 60 * 60
 
     def __init__(
         self,
@@ -38,11 +43,24 @@ class EarlyMovementScannerDeepAnalyzer:
             ChartLoader
         ] = None,
         chart_days: int = DEFAULT_CHART_DAYS,
+        max_chart_age_seconds: Optional[
+            float
+        ] = None,
+        clock: Optional[Clock] = None,
     ) -> None:
         if chart_days < 1:
             raise ValueError(
                 "O período do gráfico deve ser "
                 "maior que zero."
+            )
+
+        if (
+            max_chart_age_seconds is not None
+            and max_chart_age_seconds <= 0
+        ):
+            raise ValueError(
+                "A idade máxima do gráfico deve "
+                "ser maior que zero."
             )
 
         self._analyzer = (
@@ -56,6 +74,10 @@ class EarlyMovementScannerDeepAnalyzer:
         )
 
         self._chart_days = chart_days
+        self._max_chart_age_seconds = (
+            max_chart_age_seconds
+        )
+        self._clock = clock or time.time
 
     def analyze_candidates(
         self,
@@ -113,6 +135,17 @@ class EarlyMovementScannerDeepAnalyzer:
                 error="chart_data_unavailable",
             )
 
+        if (
+            self._max_chart_age_seconds is not None
+            and not self._is_chart_fresh(
+                chart_data,
+            )
+        ):
+            return EarlyMovementScannerAnalysisResult(
+                candidate=candidate,
+                error="chart_data_stale",
+            )
+
         try:
             analysis = self._analyzer.analyze(
                 chart_data,
@@ -131,6 +164,62 @@ class EarlyMovementScannerDeepAnalyzer:
             candidate=candidate,
             analysis=analysis,
             chart_available=True,
+        )
+
+    def _is_chart_fresh(
+        self,
+        chart_data: Mapping[str, Any],
+    ) -> bool:
+        prices = chart_data.get("prices")
+
+        if not isinstance(
+            prices,
+            (list, tuple),
+        ):
+            return False
+
+        timestamps = []
+
+        for point in prices:
+            if not isinstance(
+                point,
+                (list, tuple),
+            ):
+                continue
+
+            if len(point) < 2:
+                continue
+
+            timestamp = point[0]
+
+            if (
+                isinstance(timestamp, bool)
+                or not isinstance(
+                    timestamp,
+                    (int, float),
+                )
+            ):
+                continue
+
+            timestamps.append(
+                float(timestamp),
+            )
+
+        if not timestamps:
+            return False
+
+        latest_timestamp_seconds = (
+            max(timestamps) / 1000.0
+        )
+
+        age_seconds = (
+            self._clock()
+            - latest_timestamp_seconds
+        )
+
+        return (
+            0 <= age_seconds
+            <= self._max_chart_age_seconds
         )
 
     @staticmethod

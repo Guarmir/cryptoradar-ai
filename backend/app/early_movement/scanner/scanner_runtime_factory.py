@@ -185,6 +185,7 @@ def build_early_movement_scanner_runtime(
         deep_analyzer=(
             EarlyMovementScannerDeepAnalyzer(
                 chart_loader=scanner_chart_loader,
+                max_chart_age_seconds=7200,
             )
         ),
         candidate_arranger=(
