@@ -102,6 +102,8 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
                         alertable,
                         recent_price_return,
                         direction
+                        recent_price_return,
+                        direction
                     )
                     VALUES (
                         %s, %s, %s, %s, %s,
@@ -191,7 +193,9 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
                         resistance_break,
                         retest_confirmed,
                         breakout_direction,
-                        alertable
+                        alertable,
+                        recent_price_return,
+                        direction
                     FROM {self.TABLE_NAME}
                     WHERE scope_key = %s
                     ORDER BY observed_at DESC, id DESC

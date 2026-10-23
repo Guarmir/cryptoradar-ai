@@ -115,6 +115,42 @@ class FakeCursor:
         if normalized.startswith(
             "select observed_at"
         ):
+            selected_columns = [
+                column.strip()
+                for column in normalized
+                .split(" from ", 1)[0]
+                .removeprefix("select ")
+                .split(",")
+            ]
+
+            expected_columns = [
+                "observed_at",
+                "coin_id",
+                "symbol",
+                "name",
+                "current_price",
+                "state",
+                "relevance_score",
+                "price_acceleration",
+                "abnormal_volume_ratio",
+                "liquidity_score",
+                "volatility_expansion",
+                "persistence_score",
+                "false_breakout_risk",
+                "support_break",
+                "resistance_break",
+                "retest_confirmed",
+                "breakout_direction",
+                "alertable",
+                "recent_price_return",
+                "direction",
+            ]
+
+            assert selected_columns == expected_columns, (
+                "As colunas do SELECT não correspondem "
+                "à estrutura esperada pelo histórico."
+            )
+
             scope_key = params[0]
             limit = params[1]
 
