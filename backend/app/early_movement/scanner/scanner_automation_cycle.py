@@ -134,6 +134,28 @@ class EarlyMovementScannerAutomationCycle:
             )
         )
 
+        
+        register_followup = getattr(
+            self._scanner,
+            "register_followup",
+            None,
+        )
+
+        if (
+            callable(register_followup)
+            and isinstance(
+                alert_decision,
+                EarlyMovementScannerAlertDecision,
+            )
+            and alert_decision.should_alert
+            and alert_decision.results
+        ):
+            register_followup(
+                result.result.candidate.coin_id
+                for result in alert_decision.results
+            )
+
+
         history_records: tuple[
             EarlyMovementScannerSignalHistoryRecord,
             ...,

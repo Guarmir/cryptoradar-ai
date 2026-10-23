@@ -94,3 +94,46 @@ def test_scanner_rotates_candidates_between_cycles():
 
     assert first.analyzed_count == 8
     assert second.analyzed_count == 8
+
+
+def test_rotation_reserves_followup_slot_without_exceeding_budget():
+    rotation = EarlyMovementScannerCandidateRotation(
+        priority_slots=1,
+    )
+
+    candidates = tuple(range(1, 9))
+
+    result = rotation.arrange(
+        candidates,
+        acquisition_budget=4,
+        followup_ids=("8",),
+    )
+
+    assert result[:4] == (1, 8, 2, 3)
+    assert len(result[:4]) == 4
+    assert set(result) == set(candidates)
+
+
+def test_rotation_distributes_followup_priority_between_cycles():
+    rotation = EarlyMovementScannerCandidateRotation(
+        priority_slots=1,
+    )
+
+    candidates = tuple(range(1, 9))
+
+    first = rotation.arrange(
+        candidates,
+        acquisition_budget=4,
+        followup_ids=("7", "8"),
+    )
+
+    second = rotation.arrange(
+        candidates,
+        acquisition_budget=4,
+        followup_ids=("7", "8"),
+    )
+
+    assert first[1] == 7
+    assert second[0] == 8 or second[1] == 8
+    assert len(first[:4]) == 4
+    assert len(second[:4]) == 4

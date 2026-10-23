@@ -302,3 +302,43 @@ def test_cycle_renews_chart_request_budget():
 
     cycle.run()
     assert loader._request_count == 1
+
+def test_cycle_registers_alerted_assets_for_followup():
+    from types import SimpleNamespace
+
+    class RecordingScanner:
+        def __init__(self):
+            self.registered = []
+
+        def scan(self):
+            return make_scan_result()
+
+        def register_followup(self, coin_ids):
+            self.registered.extend(coin_ids)
+
+    scanner = RecordingScanner()
+
+    ranked_result = SimpleNamespace(
+        result=SimpleNamespace(
+            candidate=SimpleNamespace(
+                coin_id="akedo",
+            ),
+        ),
+    )
+
+    decision = EarlyMovementScannerAlertDecision(
+        should_alert=True,
+        results=(ranked_result,),
+    )
+
+    cycle = EarlyMovementScannerAutomationCycle(
+        scanner=scanner,
+        alert_decision_maker=FakeAlertDecisionMaker(
+            decision,
+        ),
+    )
+
+    result = cycle.run()
+
+    assert scanner.registered == ["akedo"]
+    assert result.should_alert is True

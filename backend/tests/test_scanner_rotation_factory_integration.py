@@ -83,3 +83,112 @@ def test_factory_does_not_create_rotation_when_disabled(
     )
 
     assert runtime is not None
+
+
+def test_factory_creates_followup_when_enabled(monkeypatch):
+    monkeypatch.setenv(
+        "EARLY_MOVEMENT_SCANNER_FOLLOWUP_ENABLED",
+        "true",
+    )
+    monkeypatch.setenv(
+        "EARLY_MOVEMENT_SCANNER_ROTATION_ENABLED",
+        "true",
+    )
+
+    created = []
+
+    original_followup = (
+        scanner_runtime_factory
+        .EarlyMovementScannerActiveFollowup
+    )
+
+    class RecordingFollowup(original_followup):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            created.append(self)
+
+    monkeypatch.setattr(
+        scanner_runtime_factory,
+        "EarlyMovementScannerActiveFollowup",
+        RecordingFollowup,
+    )
+
+    config = EarlyMovementScannerRuntimeConfig(
+        enabled=True,
+        interval_seconds=120,
+        push_enabled=False,
+    )
+
+    runtime = (
+        scanner_runtime_factory
+        .build_early_movement_scanner_runtime(config)
+    )
+
+    assert runtime is not None
+    assert len(created) == 1
+
+
+def test_factory_keeps_followup_disabled_by_default(monkeypatch):
+    monkeypatch.delenv(
+        "EARLY_MOVEMENT_SCANNER_FOLLOWUP_ENABLED",
+        raising=False,
+    )
+
+    def unexpected_followup(**kwargs):
+        raise AssertionError(
+            "Acompanhamento não deveria ser criado."
+        )
+
+    monkeypatch.setattr(
+        scanner_runtime_factory,
+        "EarlyMovementScannerActiveFollowup",
+        unexpected_followup,
+    )
+
+    config = EarlyMovementScannerRuntimeConfig(
+        enabled=True,
+        interval_seconds=120,
+        push_enabled=False,
+    )
+
+    runtime = (
+        scanner_runtime_factory
+        .build_early_movement_scanner_runtime(config)
+    )
+
+    assert runtime is not None
+
+
+def test_factory_supports_followup_without_rotation(monkeypatch):
+    monkeypatch.setenv(
+        "EARLY_MOVEMENT_SCANNER_FOLLOWUP_ENABLED",
+        "true",
+    )
+    monkeypatch.setenv(
+        "EARLY_MOVEMENT_SCANNER_ROTATION_ENABLED",
+        "false",
+    )
+
+    def unexpected_bridge(**kwargs):
+        raise AssertionError(
+            "Rotação não deveria ser criada."
+        )
+
+    monkeypatch.setattr(
+        scanner_runtime_factory,
+        "EarlyMovementScannerRotationBridge",
+        unexpected_bridge,
+    )
+
+    config = EarlyMovementScannerRuntimeConfig(
+        enabled=True,
+        interval_seconds=120,
+        push_enabled=False,
+    )
+
+    runtime = (
+        scanner_runtime_factory
+        .build_early_movement_scanner_runtime(config)
+    )
+
+    assert runtime is not None

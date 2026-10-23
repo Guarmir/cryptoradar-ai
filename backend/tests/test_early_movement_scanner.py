@@ -308,3 +308,107 @@ def test_scanner_rejects_invalid_limits() -> None:
         EarlyMovementScanner(
             result_limit=0,
         )
+
+def test_scanner_preserves_followup_between_cycles() -> None:
+    from types import SimpleNamespace
+
+    from app.early_movement.scanner.scanner_active_followup import (
+        EarlyMovementScannerActiveFollowup,
+    )
+    from app.early_movement.scanner.scanner_candidate_selector import (
+        EarlyMovementScannerCandidateSelector,
+    )
+    from app.early_movement.scanner.scanner_market_asset import (
+        EarlyMovementScannerMarketAsset,
+    )
+
+    def make_asset(coin_id, change):
+        return EarlyMovementScannerMarketAsset(
+            coin_id=coin_id,
+            symbol=coin_id.upper(),
+            name=coin_id,
+            current_price=10.0,
+            total_volume=500_000_000,
+            market_cap=5_000_000_000,
+            price_change_percentage_24h=change,
+            market_cap_rank=10,
+        )
+
+    class ChangingMarketProvider:
+        def __init__(self):
+            self.cycle = 0
+
+        def fetch(self):
+            self.cycle += 1
+
+            if self.cycle == 1:
+                changes = {
+                    "akedo": 5.0,
+                    "dash": 4.0,
+                    "zama": 3.0,
+                }
+            else:
+                changes = {
+                    "akedo": 0.5,
+                    "dash": 5.0,
+                    "zama": 4.0,
+                }
+
+            return tuple(
+                make_asset(coin_id, change)
+                for coin_id, change in changes.items()
+            )
+
+    class TrackingAnalyzer:
+        def __init__(self):
+            self.cycles = []
+
+        def analyze_candidates(self, candidates):
+            self.cycles.append(
+                tuple(candidate.coin_id for candidate in candidates)
+            )
+
+            return tuple(
+                SimpleNamespace(
+                    candidate=candidate,
+                    analysis=object(),
+                )
+                for candidate in candidates
+            )
+
+    class TrackingRanker:
+        def rank(self, results, *, limit):
+            return tuple(
+                SimpleNamespace(result=result)
+                for result in results[:limit]
+            )
+
+    analyzer = TrackingAnalyzer()
+    followup = EarlyMovementScannerActiveFollowup()
+
+    scanner = EarlyMovementScanner(
+        market_provider=ChangingMarketProvider(),
+        candidate_selector=EarlyMovementScannerCandidateSelector(),
+        deep_analyzer=analyzer,
+        result_ranker=TrackingRanker(),
+        candidate_limit=2,
+        result_limit=1,
+        active_followup=followup,
+    )
+
+    scanner.scan()
+
+    assert analyzer.cycles[0] == ("akedo", "dash")
+    assert followup.active_ids() == ()
+
+    # Simula o registro de um ativo aprovado
+    # pela decisão de alerta.
+    scanner.register_followup(("akedo",))
+
+    assert followup.active_ids() == ("akedo",)
+
+    scanner.scan()
+
+    assert "akedo" in analyzer.cycles[1]
+    assert len(analyzer.cycles[1]) == 2
+    assert analyzer.cycles[1][0] == "akedo"

@@ -1,5 +1,5 @@
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from app.early_movement.liquidity import (
     EarlyMovementLiquidityEvaluator,
@@ -18,9 +18,8 @@ from app.early_movement.scanner.scanner_asset_eligibility_filter import (
 class EarlyMovementScannerCandidateSelector:
     DEFAULT_MINIMUM_LIQUIDITY_SCORE = 50.0
     DEFAULT_CANDIDATE_LIMIT = 20
+    DEFAULT_FOLLOWUP_SLOTS = 4
 
-    # Evita premiar indefinidamente movimentos
-    # de 24h que já podem estar muito avançados.
     MAX_ACTIVITY_PRIORITY = 5.0
 
     def __init__(
@@ -59,11 +58,19 @@ class EarlyMovementScannerCandidateSelector:
         assets: Iterable[EarlyMovementScannerMarketAsset],
         *,
         limit: int = DEFAULT_CANDIDATE_LIMIT,
+        followup_ids: Iterable[str] = (),
+        followup_slots: int = DEFAULT_FOLLOWUP_SLOTS,
     ) -> tuple[EarlyMovementScannerCandidate, ...]:
         if limit < 1:
             raise ValueError(
                 "O limite de candidatos deve ser "
                 "maior que zero."
+            )
+
+        if followup_slots < 0:
+            raise ValueError(
+                "As vagas de acompanhamento "
+                "não podem ser negativas."
             )
 
         candidates: list[
@@ -101,7 +108,38 @@ class EarlyMovementScannerCandidateSelector:
 
         candidates.sort(key=self._sort_key)
 
-        return tuple(candidates[:limit])
+        normalized_followup_ids = {
+            coin_id.strip()
+            for coin_id in followup_ids
+            if isinstance(coin_id, str)
+            and coin_id.strip()
+        }
+
+        if not normalized_followup_ids or followup_slots == 0:
+            return tuple(candidates[:limit])
+
+        reserved_limit = min(followup_slots, limit)
+
+        followup_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate.coin_id in normalized_followup_ids
+        ][:reserved_limit]
+
+        selected_ids = {
+            candidate.coin_id
+            for candidate in followup_candidates
+        }
+
+        discovery_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate.coin_id not in selected_ids
+        ][:limit - len(followup_candidates)]
+
+        return tuple(
+            followup_candidates + discovery_candidates
+        )
 
     @staticmethod
     def _sort_key(

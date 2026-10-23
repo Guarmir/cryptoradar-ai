@@ -1,4 +1,4 @@
-
+﻿
 import pytest
 
 from app.early_movement.scanner import (
@@ -259,3 +259,107 @@ def test_selector_excludes_stablecoins_before_candidate_limit() -> None:
     assert "tether" not in selected_coin_ids
     assert "usd-coin" not in selected_coin_ids
     assert "usd1-wlfi" not in selected_coin_ids
+
+
+def test_followup_prioritizes_previous_asset() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
+
+    assets = tuple(
+        _asset(
+            coin_id=f"asset-{index}",
+            symbol=f"a{index}",
+            total_volume=500_000_000,
+            market_cap=5_000_000_000,
+            change_24h=float(index),
+            rank=index,
+        )
+        for index in range(1, 7)
+    )
+
+    result = selector.select(
+        assets,
+        limit=3,
+        followup_ids=("asset-1",),
+        followup_slots=1,
+    )
+
+    assert tuple(
+        candidate.coin_id for candidate in result
+    ) == ("asset-1", "asset-5", "asset-6")
+
+
+def test_followup_respects_reserved_slots() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
+
+    assets = tuple(
+        _asset(
+            coin_id=f"asset-{index}",
+            symbol=f"a{index}",
+            total_volume=500_000_000,
+            market_cap=5_000_000_000,
+            change_24h=float(index),
+            rank=index,
+        )
+        for index in range(1, 7)
+    )
+
+    result = selector.select(
+        assets,
+        limit=4,
+        followup_ids=("asset-1", "asset-2", "asset-3"),
+        followup_slots=2,
+    )
+
+    selected = tuple(
+        candidate.coin_id for candidate in result
+    )
+
+    assert len(selected) == 4
+    assert "asset-3" in selected
+    assert "asset-2" in selected
+    assert "asset-6" in selected
+    assert "asset-5" in selected
+    assert "asset-1" not in selected
+
+
+def test_followup_cannot_bypass_stablecoin_filter() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
+
+    assets = (
+        _asset(
+            coin_id="tether",
+            symbol="usdt",
+            total_volume=30_000_000_000,
+            market_cap=180_000_000_000,
+            change_24h=0.01,
+            rank=3,
+        ),
+        _asset(
+            coin_id="akedo",
+            symbol="ake",
+            total_volume=500_000_000,
+            market_cap=5_000_000_000,
+            change_24h=2.0,
+            rank=50,
+        ),
+    )
+
+    result = selector.select(
+        assets,
+        followup_ids=("tether", "akedo"),
+    )
+
+    assert tuple(
+        candidate.coin_id for candidate in result
+    ) == ("akedo",)
+
+
+def test_followup_rejects_negative_slots() -> None:
+    selector = EarlyMovementScannerCandidateSelector()
+
+    with pytest.raises(ValueError, match="negativas"):
+        selector.select(
+            (),
+            followup_slots=-1,
+        )
+

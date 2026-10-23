@@ -15,6 +15,9 @@ class EarlyMovementScannerRotationBridge:
     Integra a rotação ao scanner e recebe
     confirmações do carregador de gráficos.
 
+    Permite priorizar ativos em acompanhamento
+    sem aumentar o orçamento de aquisições.
+
     Falhas internas da rotação não devem
     interromper a análise de mercado.
     """
@@ -40,6 +43,8 @@ class EarlyMovementScannerRotationBridge:
     def arrange(
         self,
         candidates: Iterable[CandidateT],
+        *,
+        followup_ids: Iterable[str] = (),
     ) -> tuple[CandidateT, ...]:
         original = tuple(candidates)
 
@@ -49,6 +54,7 @@ class EarlyMovementScannerRotationBridge:
                 acquisition_budget=(
                     self._acquisition_budget
                 ),
+                followup_ids=followup_ids,
             )
         except Exception:
             return original

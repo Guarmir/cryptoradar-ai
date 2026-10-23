@@ -59,6 +59,9 @@ import os
 from app.early_movement.scanner.scanner_rotation_bridge import (
     EarlyMovementScannerRotationBridge,
 )
+from app.early_movement.scanner.scanner_active_followup import (
+    EarlyMovementScannerActiveFollowup,
+)
 
 
 HISTORY_SCOPE_KEY = (
@@ -181,6 +184,19 @@ def build_early_movement_scanner_runtime(
         )
     )
 
+    followup_enabled = os.getenv(
+        "EARLY_MOVEMENT_SCANNER_FOLLOWUP_ENABLED",
+        "false",
+    ).strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+    active_followup = (
+        EarlyMovementScannerActiveFollowup()
+        if followup_enabled
+        else None
+    )
+
     scanner = EarlyMovementScanner(
         deep_analyzer=(
             EarlyMovementScannerDeepAnalyzer(
@@ -193,6 +209,7 @@ def build_early_movement_scanner_runtime(
             if rotation_bridge is not None
             else None
         ),
+        active_followup=active_followup,
     )
 
     cycle = (

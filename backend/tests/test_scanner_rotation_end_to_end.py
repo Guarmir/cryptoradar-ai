@@ -188,3 +188,90 @@ def test_rotation_continues_after_chart_failures():
         for coin_id in acquired
     )
 
+
+
+def test_followup_receives_chart_priority_across_cycles():
+    from types import SimpleNamespace
+
+    from app.early_movement.scanner.scanner_active_followup import (
+        EarlyMovementScannerActiveFollowup,
+    )
+
+    acquired = []
+
+    bridge = EarlyMovementScannerRotationBridge(
+        acquisition_budget=4,
+        priority_slots=1,
+    )
+
+    def fake_chart_loader(coin_id, days):
+        acquired.append(coin_id)
+        return {"prices": [[1, 100.0]]}
+
+    loader = EarlyMovementScannerChartLoader(
+        chart_loader=fake_chart_loader,
+        cache_loader=lambda coin_id, days: None,
+        request_budget=4,
+        on_chart_result=bridge.on_chart_result,
+    )
+
+    class FollowupSelector:
+        def select(
+            self,
+            assets,
+            *,
+            limit,
+            followup_ids=(),
+        ):
+            return tuple(assets[:limit])
+
+    class FollowupRanker:
+        def rank(self, results, *, limit):
+            relevant = [
+                result
+                for result in results
+                if (
+                    result.analysis is not None
+                    and result.candidate.coin_id == "coin-19"
+                )
+            ]
+
+            if relevant:
+                return (
+                    SimpleNamespace(result=relevant[0]),
+                )
+
+            return ()
+
+    followup = EarlyMovementScannerActiveFollowup()
+
+    scanner = EarlyMovementScanner(
+        market_provider=FakeMarketProvider(),
+        candidate_selector=FollowupSelector(),
+        deep_analyzer=LoaderBackedAnalyzer(loader),
+        result_ranker=FollowupRanker(),
+        candidate_arranger=bridge.arrange,
+        active_followup=followup,
+    )
+
+    # Primeiro ciclo: aquisição inicial e descoberta.
+    loader.reset_budget()
+    scanner.scan()
+
+    # Simula um ativo relevante já identificado.
+    followup.observe(("coin-19",))
+
+    first_cycle_acquisitions = len(acquired)
+
+    # Segundo ciclo: o ativo acompanhado deve
+    # receber prioridade na aquisição.
+    loader.reset_budget()
+    scanner.scan()
+
+    second_cycle_acquisitions = acquired[
+        first_cycle_acquisitions:
+    ]
+
+    assert "coin-19" in second_cycle_acquisitions
+    assert len(second_cycle_acquisitions) <= 4
+    assert loader.stats.acquisition_attempts <= 4

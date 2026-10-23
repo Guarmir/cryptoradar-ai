@@ -5,6 +5,9 @@ from typing import Optional
 from app.early_movement.scanner.coingecko_scanner_market_provider import (
     CoinGeckoEarlyMovementScannerMarketProvider,
 )
+from app.early_movement.scanner.scanner_active_followup import (
+    EarlyMovementScannerActiveFollowup,
+)
 from app.early_movement.scanner.scanner_candidate import (
     EarlyMovementScannerCandidate,
 )
@@ -52,6 +55,9 @@ class EarlyMovementScanner:
         candidate_arranger: Optional[
             CandidateArranger
         ] = None,
+        active_followup: Optional[
+            EarlyMovementScannerActiveFollowup
+        ] = None,
     ) -> None:
         if candidate_limit < 1:
             raise ValueError(
@@ -86,19 +92,43 @@ class EarlyMovementScanner:
         self._candidate_limit = candidate_limit
         self._result_limit = result_limit
         self._candidate_arranger = candidate_arranger
+        self._active_followup = active_followup
 
     def scan(self) -> EarlyMovementScannerRunResult:
         assets = self._market_provider.fetch()
 
-        candidates = self._candidate_selector.select(
-            assets,
-            limit=self._candidate_limit,
-        )
+        followup_ids: tuple[str, ...] = ()
 
-        if self._candidate_arranger is not None:
-            candidates = self._candidate_arranger(
-                tuple(candidates),
+        if self._active_followup is not None:
+            self._active_followup.advance_cycle()
+            followup_ids = self._active_followup.active_ids()
+
+        
+        if self._active_followup is None:
+            candidates = self._candidate_selector.select(
+                assets,
+                limit=self._candidate_limit,
             )
+        else:
+            candidates = self._candidate_selector.select(
+                assets,
+                limit=self._candidate_limit,
+                followup_ids=followup_ids,
+            )
+
+
+        
+        if self._candidate_arranger is not None:
+            if self._active_followup is None:
+                candidates = self._candidate_arranger(
+                    tuple(candidates)
+                )
+            else:
+                candidates = self._candidate_arranger(
+                    tuple(candidates),
+                    followup_ids=followup_ids,
+                )
+
 
         analysis_results = (
             self._deep_analyzer.analyze_candidates(
@@ -127,3 +157,12 @@ class EarlyMovementScanner:
             analysis_results=analysis_results,
             ranked_results=ranked_results,
         )
+
+    def register_followup(
+        self,
+        coin_ids,
+    ) -> None:
+        if self._active_followup is None:
+            return
+
+        self._active_followup.observe(coin_ids)

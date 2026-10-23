@@ -35,6 +35,7 @@ class EarlyMovementScannerCandidateRotation:
         candidates: Iterable[CandidateT],
         *,
         acquisition_budget: int,
+        followup_ids: Iterable[str] = (),
     ) -> tuple[CandidateT, ...]:
         if acquisition_budget < 1:
             raise ValueError(
@@ -94,8 +95,55 @@ class EarlyMovementScannerCandidateRotation:
             not in priority_ids
         )
 
+        followup_set = {
+            coin_id
+            for coin_id in followup_ids
+            if isinstance(coin_id, str) and coin_id
+        }
+
+        followup_selected = ()
+
+        if followup_set and len(priority) < acquisition_budget:
+            eligible_followup = [
+                candidate
+                for candidate in remaining
+                if self._identity(candidate) in followup_set
+            ]
+
+            eligible_followup.sort(
+                key=lambda candidate: (
+                    self._last_successful.get(
+                        self._identity(candidate),
+                        -1,
+                    ),
+                    self._last_scheduled.get(
+                        self._identity(candidate),
+                        -1,
+                    ),
+                )
+            )
+
+            if eligible_followup:
+                followup_selected = (
+                    eligible_followup[0],
+                )
+
+        followup_selected_ids = {
+            self._identity(candidate)
+            for candidate in followup_selected
+        }
+
+        remaining = tuple(
+            candidate
+            for candidate in remaining
+            if self._identity(candidate)
+            not in followup_selected_ids
+        )
+
         rotation_slots = max(
-            acquisition_budget - len(priority),
+            acquisition_budget
+            - len(priority)
+            - len(followup_selected),
             0,
         )
 
@@ -119,7 +167,13 @@ class EarlyMovementScannerCandidateRotation:
             for _, candidate in rotated[:rotation_slots]
         ]
 
-        for candidate in priority + tuple(selected):
+        scheduled = (
+            priority
+            + followup_selected
+            + tuple(selected)
+        )
+
+        for candidate in scheduled:
             self._last_scheduled[
                 self._identity(candidate)
             ] = self._cycle
@@ -135,11 +189,7 @@ class EarlyMovementScannerCandidateRotation:
             if index not in selected_positions
         ]
 
-        return (
-            priority
-            + tuple(selected)
-            + tuple(rest)
-        )
+        return scheduled + tuple(rest)
 
     def record_success(self, coin_id: str) -> None:
         if not coin_id:
