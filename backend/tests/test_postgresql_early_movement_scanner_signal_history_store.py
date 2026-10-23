@@ -11,6 +11,9 @@ from app.early_movement.scanner.postgresql_scanner_signal_history_store import (
 from app.early_movement.scanner.scanner_signal_history_record import (
     EarlyMovementScannerSignalHistoryRecord,
 )
+from app.early_movement.early_movement_direction import (
+    EarlyMovementDirection,
+)
 
 
 class FakeDatabase:
@@ -418,3 +421,50 @@ def test_store_rejects_invalid_limit() -> None:
         store.load_recent(
             limit=0,
         )
+
+        
+def test_store_preserves_directional_history() -> None:
+    database = FakeDatabase()
+
+    store = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="test-scope",
+        connection_factory=FakeConnectionFactory(database),
+    )
+
+    original = make_record()
+
+    directional_record = (
+        EarlyMovementScannerSignalHistoryRecord(
+            **{
+                **vars(original),
+                "recent_price_return": 1.75,
+                "direction": EarlyMovementDirection.UP,
+            }
+        )
+    )
+
+    store.save(directional_record)
+
+    records = store.load_recent()
+
+    assert len(records) == 1
+    assert records[0].recent_price_return == pytest.approx(1.75)
+    assert records[0].direction == EarlyMovementDirection.UP
+
+
+def test_store_accepts_unknown_direction() -> None:
+    database = FakeDatabase()
+
+    store = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="test-scope",
+        connection_factory=FakeConnectionFactory(database),
+    )
+
+    store.save(make_record())
+
+    records = store.load_recent()
+
+    assert records[0].recent_price_return is None
+    assert records[0].direction is None

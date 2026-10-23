@@ -5,6 +5,9 @@ from typing import Optional
 from app.early_movement.early_movement_state import (
     EarlyMovementState,
 )
+from app.early_movement.early_movement_direction import (
+    EarlyMovementDirection,
+)
 
 
 @dataclass(frozen=True)
@@ -33,3 +36,6 @@ class EarlyMovementScannerSignalHistoryRecord:
     breakout_direction: Optional[str] = None
 
     alertable: bool = False
+
+    recent_price_return: Optional[float] = None
+    direction: Optional[EarlyMovementDirection] = None

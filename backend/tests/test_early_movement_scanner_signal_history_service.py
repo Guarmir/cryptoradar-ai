@@ -9,6 +9,9 @@ from app.early_movement.scanner.scanner_alert_decision import (
 from app.early_movement.scanner.scanner_signal_history_service import (
     EarlyMovementScannerSignalHistoryService,
 )
+from app.early_movement.early_movement_direction import (
+    EarlyMovementDirection,
+)
 
 
 class FakeHistoryStore:
@@ -33,6 +36,7 @@ class FakeHistoryStore:
         return tuple(
             self.records[-limit:]
         )
+
 
 
 def _ranked_result(
@@ -66,15 +70,27 @@ def _ranked_result(
         retest_confirmed=True,
     )
 
+    metrics = SimpleNamespace(
+        recent_price_return=2.5,
+        price_acceleration=2.0,
+        abnormal_volume_ratio=1.8,
+        persistence_score=70.0,
+    )
+
+    price_structure = SimpleNamespace(
+        support_break=False,
+        resistance_break=True,
+    )
+
     breakout_confirmation = SimpleNamespace(
         breakout_direction="up",
     )
 
     analysis = SimpleNamespace(
+        metrics=metrics,
+        price_structure=price_structure,
         evidence=evidence,
-        breakout_confirmation=(
-            breakout_confirmation
-        ),
+        breakout_confirmation=breakout_confirmation,
     )
 
     analysis_result = SimpleNamespace(
@@ -86,6 +102,7 @@ def _ranked_result(
         relevance_score=relevance_score,
         result=analysis_result,
     )
+
 
 
 def test_history_service_records_scanner_results() -> None:
@@ -133,6 +150,16 @@ def test_history_service_records_scanner_results() -> None:
     )
 
     assert len(records) == 2
+
+    assert records[0].coin_id == "near"
+    assert records[0].recent_price_return == 2.5
+    assert records[0].direction == EarlyMovementDirection.UP
+
+    assert records[1].coin_id == "uniswap"
+    assert records[1].recent_price_return == 2.5
+    assert records[1].direction == EarlyMovementDirection.UP
+
+    assert len(records) == 2
     assert len(store.records) == 2
 
     first = records[0]
@@ -156,3 +183,50 @@ def test_history_service_records_scanner_results() -> None:
 
     assert second.coin_id == "uniswap"
     assert second.alertable is False
+
+        # Simula uma mudança para pressão de baixa.
+    down = _ranked_result(
+        coin_id="down-asset",
+        symbol="DOWN",
+        state=EarlyMovementState.EARLY_MOVEMENT,
+        relevance_score=70.0,
+    )
+
+    down.result.analysis.metrics.recent_price_return = -2.5
+    down.result.analysis.metrics.price_acceleration = -2.0
+    down.result.analysis.price_structure.resistance_break = False
+    down.result.analysis.price_structure.support_break = True
+
+    down_records = service.record(
+        scan_result=SimpleNamespace(ranked_results=(down,)),
+        alert_decision=EarlyMovementScannerAlertDecision(
+            should_alert=False,
+            results=(),
+        ),
+    )
+
+    assert down_records[0].direction == EarlyMovementDirection.DOWN
+    assert down_records[0].recent_price_return == -2.5
+
+    # Simula ausência de pressão direcional suficiente.
+    neutral = _ranked_result(
+        coin_id="neutral-asset",
+        symbol="NEUTRAL",
+        state=EarlyMovementState.OBSERVATION,
+        relevance_score=40.0,
+    )
+
+    neutral.result.analysis.metrics.recent_price_return = 0.1
+    neutral.result.analysis.metrics.price_acceleration = 0.0
+    neutral.result.analysis.price_structure.resistance_break = False
+
+    neutral_records = service.record(
+        scan_result=SimpleNamespace(ranked_results=(neutral,)),
+        alert_decision=EarlyMovementScannerAlertDecision(
+            should_alert=False,
+            results=(),
+        ),
+    )
+
+    assert neutral_records[0].direction == EarlyMovementDirection.NEUTRAL
+    assert neutral_records[0].recent_price_return == 0.1

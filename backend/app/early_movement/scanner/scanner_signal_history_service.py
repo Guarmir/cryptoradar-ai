@@ -12,6 +12,9 @@ from app.early_movement.scanner.scanner_signal_history_record import (
 from app.early_movement.scanner.scanner_signal_history_store import (
     EarlyMovementScannerSignalHistoryStore,
 )
+from app.early_movement.early_movement_direction_classifier import (
+    EarlyMovementDirectionClassifier,
+)
 
 
 class EarlyMovementScannerSignalHistoryService:
@@ -55,6 +58,11 @@ class EarlyMovementScannerSignalHistoryService:
 
             breakout_confirmation = (
                 analysis.breakout_confirmation
+            )
+
+            direction = EarlyMovementDirectionClassifier().classify(
+                metrics=analysis.metrics,
+                price_structure=analysis.price_structure,
             )
 
             record = (
@@ -103,6 +111,10 @@ class EarlyMovementScannerSignalHistoryService:
                         id(ranked)
                         in alertable_ids
                     ),
+                    recent_price_return=(
+                        analysis.metrics.recent_price_return
+                    ),
+                    direction=direction,
                 )
             )
 

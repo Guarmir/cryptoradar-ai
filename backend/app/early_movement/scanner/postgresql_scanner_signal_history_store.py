@@ -9,6 +9,9 @@ from app.early_movement.scanner.scanner_signal_history_record import (
 from app.early_movement.scanner.scanner_signal_history_store import (
     EarlyMovementScannerSignalHistoryStore,
 )
+from app.early_movement.early_movement_direction import (
+    EarlyMovementDirection,
+)
 
 
 class PostgreSQLEarlyMovementScannerSignalHistoryStore(
@@ -96,13 +99,16 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
                         resistance_break,
                         retest_confirmed,
                         breakout_direction,
-                        alertable
+                        alertable,
+                        recent_price_return,
+                        direction
                     )
                     VALUES (
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s
+                        %s, %s, %s, %s, %s,
+                        %s
                     )
                     """,
                     (
@@ -125,6 +131,12 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
                         record.retest_confirmed,
                         record.breakout_direction,
                         record.alertable,
+                        record.recent_price_return,
+                        (
+                            record.direction.value
+                            if record.direction is not None
+                            else None
+                        ),
                     ),
                 )
 
@@ -245,4 +257,10 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
             retest_confirmed=row[15],
             breakout_direction=row[16],
             alertable=row[17],
+            recent_price_return=row[18],
+            direction=(
+                EarlyMovementDirection(row[19])
+                if row[19] is not None
+                else None
+            ),
         )
