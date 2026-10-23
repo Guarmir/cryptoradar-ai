@@ -32,8 +32,11 @@ class EarlyMovementMetricExtractor:
 
         return EarlyMovementMetrics(
             price_acceleration=self._price_acceleration(
-                prices,
+            prices,
             ),
+            recent_price_return=self._recent_price_return(
+            prices,
+        ),
             abnormal_volume_ratio=self._abnormal_volume_ratio(
                 volumes,
             ),
@@ -75,6 +78,20 @@ class EarlyMovementMetricExtractor:
             return None
 
         return recent_return - previous_return
+
+    def _recent_price_return(
+        self,
+        prices: list[float],
+    ) -> Optional[float]:
+        segment = self.PRICE_ACCELERATION_SEGMENT
+
+        if len(prices) < segment + 1:
+            return None
+
+        return self._percentage_change(
+            prices[-(segment + 1)],
+            prices[-1],
+        )
 
     def _abnormal_volume_ratio(
         self,

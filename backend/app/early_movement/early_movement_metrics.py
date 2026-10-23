@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 from typing import Optional
 
@@ -10,3 +11,9 @@ class EarlyMovementMetrics:
     persistence_score: Optional[float] = None
     price_sample_count: int = 0
     volume_sample_count: int = 0
+
+    # Retorno percentual líquido do trecho recente.
+    # Positivo: preço subiu.
+    # Negativo: preço caiu.
+    # None: dados insuficientes.
+    recent_price_return: Optional[float] = None
