@@ -29,6 +29,9 @@ from app.early_movement.scanner.scanner_signal_history_service import (
 from app.push.push_delivery_models import (
     PushDeliveryBatchResult,
 )
+from app.early_movement.early_movement_direction_transition import (
+    EarlyMovementDirectionTransition,
+)
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,16 @@ class EarlyMovementScannerAutomationCycleResult:
 
     history_records: tuple[
         EarlyMovementScannerSignalHistoryRecord,
+        ...,
+    ] = ()
+
+    direction_transitions: tuple[
+        EarlyMovementDirectionTransition,
+        ...,
+    ] = ()
+
+    push_results: tuple[
+        PushDeliveryBatchResult,
         ...,
     ] = ()
 
@@ -155,6 +168,11 @@ class EarlyMovementScannerAutomationCycle:
                 for result in alert_decision.results
             )
 
+        direction_transitions: tuple[
+            EarlyMovementDirectionTransition,
+            ...,
+        ] = ()
+
 
         history_records: tuple[
             EarlyMovementScannerSignalHistoryRecord,
@@ -166,6 +184,13 @@ class EarlyMovementScannerAutomationCycle:
                 self._history_service.record(
                     scan_result=scan_result,
                     alert_decision=alert_decision,
+                )
+            )
+            direction_transitions = tuple(
+                getattr(
+                    self._history_service,
+                    "last_transitions",
+                    (),
                 )
             )
 
@@ -191,4 +216,5 @@ class EarlyMovementScannerAutomationCycle:
             history_records=history_records,
             push_results=push_results,
             chart_loader_stats=chart_loader_stats,
+            direction_transitions=direction_transitions,
         )

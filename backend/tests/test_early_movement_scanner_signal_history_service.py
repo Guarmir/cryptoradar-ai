@@ -12,6 +12,9 @@ from app.early_movement.scanner.scanner_signal_history_service import (
 from app.early_movement.early_movement_direction import (
     EarlyMovementDirection,
 )
+from app.early_movement.early_movement_direction_transition import (
+    EarlyMovementDirectionTransitionType,
+)
 
 
 class FakeHistoryStore:
@@ -36,6 +39,30 @@ class FakeHistoryStore:
         return tuple(
             self.records[-limit:]
         )
+
+    
+    def load_latest_for_coin(
+        self,
+        *,
+        coin_id: str,
+    ):
+        matching = [
+            record
+            for record in self.records
+            if record.coin_id == coin_id
+        ]
+
+        if not matching:
+            return None
+
+        return max(
+            enumerate(matching),
+            key=lambda item: (
+                item[1].observed_at,
+                item[0],
+            ),
+        )[1]
+
 
 
 
@@ -230,3 +257,117 @@ def test_history_service_records_scanner_results() -> None:
 
     assert neutral_records[0].direction == EarlyMovementDirection.NEUTRAL
     assert neutral_records[0].recent_price_return == 0.1
+
+    
+def test_history_service_detects_direction_change_between_cycles():
+    store = FakeHistoryStore()
+
+    service = EarlyMovementScannerSignalHistoryService(
+        store=store,
+    )
+
+    def run_cycle(recent_return, acceleration, support_break, resistance_break):
+        ranked = _ranked_result(
+            coin_id="uniswap",
+            symbol="UNI",
+            state=EarlyMovementState.EARLY_MOVEMENT,
+            relevance_score=78.0,
+        )
+
+        ranked.result.analysis.metrics.recent_price_return = recent_return
+        ranked.result.analysis.metrics.price_acceleration = acceleration
+        ranked.result.analysis.price_structure.support_break = support_break
+        ranked.result.analysis.price_structure.resistance_break = resistance_break
+
+        return service.record(
+            scan_result=SimpleNamespace(
+                ranked_results=(ranked,),
+            ),
+            alert_decision=EarlyMovementScannerAlertDecision(
+                should_alert=False,
+                results=(),
+            ),
+        )
+
+    run_cycle(2.5, 2.0, False, True)
+
+    assert (
+        service.last_transitions[0].transition_type
+        == EarlyMovementDirectionTransitionType.INITIAL
+    )
+
+    run_cycle(-2.5, -2.0, True, False)
+
+    assert (
+        service.last_transitions[0].previous
+        == EarlyMovementDirection.UP
+    )
+
+    assert (
+        service.last_transitions[0].current
+        == EarlyMovementDirection.DOWN
+    )
+
+    assert (
+        service.last_transitions[0].transition_type
+        == EarlyMovementDirectionTransitionType.REVERSAL
+    )
+
+    
+def test_history_service_tracks_direction_evolution():
+    store = FakeHistoryStore()
+    service = EarlyMovementScannerSignalHistoryService(
+        store=store,
+    )
+
+    def run(coin_id, recent_return, acceleration, support, resistance):
+        ranked = _ranked_result(
+            coin_id=coin_id,
+            symbol=coin_id.upper(),
+            state=EarlyMovementState.EARLY_MOVEMENT,
+            relevance_score=78.0,
+        )
+
+        analysis = ranked.result.analysis
+        analysis.metrics.recent_price_return = recent_return
+        analysis.metrics.price_acceleration = acceleration
+        analysis.price_structure.support_break = support
+        analysis.price_structure.resistance_break = resistance
+
+        service.record(
+            scan_result=SimpleNamespace(
+                ranked_results=(ranked,),
+            ),
+            alert_decision=EarlyMovementScannerAlertDecision(
+                should_alert=False,
+                results=(),
+            ),
+        )
+
+        return service.last_transitions[0]
+
+    first = run("uniswap", 2.5, 2.0, False, True)
+    assert first.transition_type == (
+        EarlyMovementDirectionTransitionType.INITIAL
+    )
+
+    unchanged = run("uniswap", 2.5, 2.0, False, True)
+    assert unchanged.transition_type == (
+        EarlyMovementDirectionTransitionType.UNCHANGED
+    )
+
+    weakening = run("uniswap", 0.1, 0.0, False, False)
+    assert weakening.transition_type == (
+        EarlyMovementDirectionTransitionType.WEAKENING
+    )
+
+    emerging = run("uniswap", -2.5, -2.0, True, False)
+    assert emerging.transition_type == (
+        EarlyMovementDirectionTransitionType.EMERGING
+    )
+
+    other_coin = run("bitcoin", -2.5, -2.0, True, False)
+    assert other_coin.transition_type == (
+        EarlyMovementDirectionTransitionType.INITIAL
+    )
+

@@ -11,6 +11,13 @@ from app.push.push_delivery_models import (
     PushDeliveryBatchResult,
     PushDeliveryOutcome,
 )
+from app.early_movement.early_movement_direction import (
+    EarlyMovementDirection,
+)
+from app.early_movement.early_movement_direction_transition import (
+    EarlyMovementDirectionTransition,
+    EarlyMovementDirectionTransitionType,
+)
 
 
 class FakeScanner:
@@ -342,3 +349,38 @@ def test_cycle_registers_alerted_assets_for_followup():
 
     assert scanner.registered == ["akedo"]
     assert result.should_alert is True
+
+def test_cycle_exposes_direction_transitions() -> None:
+    scan_result = make_scan_result()
+
+    alert_decision = EarlyMovementScannerAlertDecision(
+        should_alert=False,
+        results=(),
+    )
+
+    transition = EarlyMovementDirectionTransition(
+        previous=EarlyMovementDirection.UP,
+        current=EarlyMovementDirection.DOWN,
+        transition_type=(
+            EarlyMovementDirectionTransitionType.REVERSAL
+        ),
+    )
+
+    history_service = FakeHistoryService()
+    history_service.last_transitions = (transition,)
+
+    cycle = EarlyMovementScannerAutomationCycle(
+        scanner=FakeScanner(scan_result),
+        alert_decision_maker=FakeAlertDecisionMaker(
+            alert_decision,
+        ),
+        history_service=history_service,
+    )
+
+    result = cycle.run()
+
+    assert history_service.call_count == 1
+    assert result.direction_transitions == (transition,)
+    assert result.direction_transitions[0].transition_type == (
+        EarlyMovementDirectionTransitionType.REVERSAL
+    )

@@ -15,6 +15,9 @@ from app.early_movement.scanner.scanner_signal_history_store import (
 from app.early_movement.early_movement_direction_classifier import (
     EarlyMovementDirectionClassifier,
 )
+from app.early_movement.early_movement_direction_transition import (
+    EarlyMovementDirectionTransitionDetector,
+)
 
 
 class EarlyMovementScannerSignalHistoryService:
@@ -24,6 +27,11 @@ class EarlyMovementScannerSignalHistoryService:
         store: EarlyMovementScannerSignalHistoryStore,
     ) -> None:
         self._store = store
+
+        self._transition_detector = (
+            EarlyMovementDirectionTransitionDetector()
+        )
+        self.last_transitions = ()
 
     def record(
         self,
@@ -45,6 +53,9 @@ class EarlyMovementScannerSignalHistoryService:
 
         records = []
 
+        transitions = []
+        self.last_transitions = ()
+
         for ranked in scan_result.ranked_results:
             analysis_result = ranked.result
             analysis = analysis_result.analysis
@@ -64,6 +75,25 @@ class EarlyMovementScannerSignalHistoryService:
                 metrics=analysis.metrics,
                 price_structure=analysis.price_structure,
             )
+
+            previous_record = (
+                self._store.load_latest_for_coin(
+                    coin_id=asset.coin_id,
+                )
+            )
+
+            previous_direction = (
+                previous_record.direction
+                if previous_record is not None
+                else None
+            )
+
+            transition = self._transition_detector.detect(
+                previous=previous_direction,
+                current=direction,
+            )
+
+            transitions.append(transition)
 
             record = (
                 EarlyMovementScannerSignalHistoryRecord(
@@ -125,6 +155,8 @@ class EarlyMovementScannerSignalHistoryService:
             records.append(
                 record,
             )
+
+            self.last_transitions = tuple(transitions)
 
         return tuple(
             records,
