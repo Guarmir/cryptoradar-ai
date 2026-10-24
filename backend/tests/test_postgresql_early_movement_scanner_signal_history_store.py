@@ -171,13 +171,29 @@ class FakeCursor:
             )
 
             scope_key = params[0]
-            limit = params[1]
+
+            if "and coin_id = %s" in normalized:
+                assert len(params) == 2
+                assert "order by observed_at desc, id desc" in normalized
+                assert "limit 1" in normalized
+
+                coin_id = params[1]
+                limit = 1
+            else:
+                assert len(params) == 2
+                coin_id = None
+                limit = params[1]
 
             matching = [
                 row
                 for row in self.database.rows
-                if row["scope_key"]
-                == scope_key
+                                if (
+                    row["scope_key"] == scope_key
+                    and (
+                        coin_id is None
+                        or row["values"][1] == coin_id
+                    )
+                )
             ]
 
             matching.sort(
@@ -201,6 +217,9 @@ class FakeCursor:
             "SQL não reconhecido pelo fake: "
             f"{normalized}"
         )
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
 
     def fetchall(
         self,
@@ -523,3 +542,135 @@ def test_store_accepts_unknown_direction() -> None:
 
     assert records[0].recent_price_return is None
     assert records[0].direction is None
+
+    
+def test_store_loads_latest_record_for_coin() -> None:
+    database = FakeDatabase()
+
+    store = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="test-scope",
+        connection_factory=FakeConnectionFactory(database),
+    )
+
+    store.save(
+        make_record(
+            coin_id="uniswap",
+            symbol="UNI",
+            alertable=False,
+            observed_at=datetime(
+                2026, 10, 1, 12, 0,
+                tzinfo=timezone.utc,
+            ),
+        )
+    )
+
+    store.save(
+        make_record(
+            coin_id="bitcoin",
+            symbol="BTC",
+            observed_at=datetime(
+                2026, 10, 1, 13, 0,
+                tzinfo=timezone.utc,
+            ),
+        )
+    )
+
+    store.save(
+        make_record(
+            coin_id="uniswap",
+            symbol="UNI",
+            alertable=True,
+            observed_at=datetime(
+                2026, 10, 1, 14, 0,
+                tzinfo=timezone.utc,
+            ),
+        )
+    )
+
+    record = store.load_latest_for_coin(
+        coin_id="uniswap",
+    )
+
+    assert record is not None
+    assert record.coin_id == "uniswap"
+    assert record.alertable is True
+    assert record.observed_at.hour == 14
+
+
+def test_store_returns_none_for_unknown_coin() -> None:
+    database = FakeDatabase()
+
+    store = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="test-scope",
+        connection_factory=FakeConnectionFactory(database),
+    )
+
+    store.save(make_record())
+
+    assert store.load_latest_for_coin(
+        coin_id="ethereum",
+    ) is None
+
+
+def test_store_isolates_coin_history_by_scope() -> None:
+    database = FakeDatabase()
+    factory = FakeConnectionFactory(database)
+
+    store_a = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="scope-a",
+        connection_factory=factory,
+    )
+
+    store_b = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="scope-b",
+        connection_factory=factory,
+    )
+
+    store_a.save(
+        make_record(
+            coin_id="uniswap",
+            symbol="UNI",
+            alertable=False,
+        )
+    )
+
+    store_b.save(
+        make_record(
+            coin_id="uniswap",
+            symbol="UNI",
+            alertable=True,
+        )
+    )
+
+    record_a = store_a.load_latest_for_coin(
+        coin_id="uniswap",
+    )
+
+    record_b = store_b.load_latest_for_coin(
+        coin_id="uniswap",
+    )
+
+    assert record_a is not None
+    assert record_b is not None
+    assert record_a.alertable is False
+    assert record_b.alertable is True
+
+
+def test_store_rejects_empty_coin_id() -> None:
+    database = FakeDatabase()
+
+    store = PostgreSQLEarlyMovementScannerSignalHistoryStore(
+        database_url="postgresql://test",
+        scope_key="test-scope",
+        connection_factory=FakeConnectionFactory(database),
+    )
+
+    with pytest.raises(ValueError):
+        store.load_latest_for_coin(
+            coin_id=" ",
+        )
+

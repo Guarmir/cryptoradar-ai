@@ -1,4 +1,6 @@
+
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from app.early_movement.scanner.scanner_signal_history_record import (
     EarlyMovementScannerSignalHistoryRecord,
@@ -23,5 +25,14 @@ class EarlyMovementScannerSignalHistoryStore(
     ) -> tuple[
         EarlyMovementScannerSignalHistoryRecord,
         ...,
+    ]:
+        raise NotImplementedError
+
+    def load_latest_for_coin(
+        self,
+        *,
+        coin_id: str,
+    ) -> Optional[
+        EarlyMovementScannerSignalHistoryRecord
     ]:
         raise NotImplementedError

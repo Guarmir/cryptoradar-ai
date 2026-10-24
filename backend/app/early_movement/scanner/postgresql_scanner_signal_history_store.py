@@ -220,6 +220,76 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
             for row in rows
         )
 
+    
+    def load_latest_for_coin(
+        self,
+        *,
+        coin_id: str,
+    ) -> Optional[
+        EarlyMovementScannerSignalHistoryRecord
+    ]:
+        normalized_coin_id = coin_id.strip()
+
+        if not normalized_coin_id:
+            raise ValueError(
+                "O identificador do ativo não pode ser vazio."
+            )
+
+        connection = self._connect()
+
+        try:
+            cursor = connection.cursor()
+
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT
+                        observed_at,
+                        coin_id,
+                        symbol,
+                        name,
+                        current_price,
+                        state,
+                        relevance_score,
+                        price_acceleration,
+                        abnormal_volume_ratio,
+                        liquidity_score,
+                        volatility_expansion,
+                        persistence_score,
+                        false_breakout_risk,
+                        support_break,
+                        resistance_break,
+                        retest_confirmed,
+                        breakout_direction,
+                        alertable,
+                        recent_price_return,
+                        direction
+                    FROM {self.TABLE_NAME}
+                    WHERE scope_key = %s
+                      AND coin_id = %s
+                    ORDER BY observed_at DESC, id DESC
+                    LIMIT 1
+                    """,
+                    (
+                        self._scope_key,
+                        normalized_coin_id,
+                    ),
+                )
+
+                row = cursor.fetchone()
+
+            finally:
+                cursor.close()
+
+        finally:
+            connection.close()
+
+        if row is None:
+            return None
+
+        return self._record_from_row(row)
+
+
     def _connect(
         self,
     ):
