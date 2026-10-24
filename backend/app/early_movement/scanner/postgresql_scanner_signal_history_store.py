@@ -102,8 +102,6 @@ class PostgreSQLEarlyMovementScannerSignalHistoryStore(
                         alertable,
                         recent_price_return,
                         direction
-                        recent_price_return,
-                        direction
                     )
                     VALUES (
                         %s, %s, %s, %s, %s,

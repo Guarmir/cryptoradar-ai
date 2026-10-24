@@ -96,6 +96,25 @@ class FakeCursor:
         if normalized.startswith(
             "insert into"
         ):
+            columns_section = (
+                normalized
+                .split("(", 1)[1]
+                .split(")", 1)[0]
+            )
+
+            inserted_columns = [
+                column.strip()
+                for column in columns_section.split(",")
+            ]
+
+            assert len(inserted_columns) == 21
+            assert len(set(inserted_columns)) == 21
+            assert inserted_columns[-2:] == [
+                "recent_price_return",
+                "direction",
+            ]
+
+            assert normalized.count("%s") == len(params)
             row = {
                 "id": self.database.next_id,
                 "scope_key": params[0],
