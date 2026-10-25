@@ -32,6 +32,13 @@ from app.push.push_delivery_models import (
 from app.early_movement.early_movement_direction_transition import (
     EarlyMovementDirectionTransition,
 )
+from app.early_movement.extreme_movement.extreme_movement_shadow_config import (
+    ExtremeMovementShadowConfig,
+)
+from app.early_movement.extreme_movement.extreme_movement_shadow_runner import (
+    ExtremeMovementShadowRunner,
+    ExtremeMovementShadowResult,
+)
 
 
 @dataclass(frozen=True)
@@ -124,6 +131,16 @@ class EarlyMovementScannerAutomationCycle:
             chart_stats_provider
         )
 
+        self._extreme_shadow_runner = (
+            ExtremeMovementShadowRunner()
+            if ExtremeMovementShadowConfig.is_enabled()
+            else None
+        )
+
+        self.last_extreme_shadow_result: Optional[
+            ExtremeMovementShadowResult
+        ] = None
+
     def run(
         self,
     ) -> EarlyMovementScannerAutomationCycleResult:
@@ -133,6 +150,18 @@ class EarlyMovementScannerAutomationCycle:
             self._on_cycle_start()
 
         scan_result = self._scanner.scan()
+
+        self.last_extreme_shadow_result = None
+
+        if self._extreme_shadow_runner is not None:
+            try:
+                self.last_extreme_shadow_result = (
+                    self._extreme_shadow_runner.run(
+                        scan_result
+                    )
+                )
+            except Exception:
+                self.last_extreme_shadow_result = None
 
         chart_loader_stats = None
 
