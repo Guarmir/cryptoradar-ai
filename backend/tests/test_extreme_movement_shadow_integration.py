@@ -204,3 +204,31 @@ def test_shadow_enabled_preserves_positive_push(monkeypatch):
     assert history.calls == 1
     assert shadow_runner.calls == 1
     assert cycle.last_extreme_shadow_result is not None
+
+def test_shadow_logger_failure_does_not_interrupt_cycle(monkeypatch):
+    monkeypatch.setenv(
+        "EXTREME_MOVEMENT_SHADOW_ENABLED",
+        "true",
+    )
+
+    cycle, scanner, decision, history, push = make_cycle()
+
+    shadow_runner = FakeShadowRunner()
+    cycle._extreme_shadow_runner = shadow_runner
+
+    class FailingLogger:
+        def log(self, result):
+            raise RuntimeError("Simulated logging failure")
+
+    cycle._extreme_shadow_logger = FailingLogger()
+
+    result = cycle.run()
+
+    assert shadow_runner.calls == 1
+    assert cycle.last_extreme_shadow_result is not None
+
+    assert scanner.calls == 1
+    assert decision.calls == 1
+    assert history.calls == 1
+    assert push.calls == 1
+    assert result.should_alert is False

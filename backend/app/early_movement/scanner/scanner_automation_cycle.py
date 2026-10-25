@@ -39,6 +39,9 @@ from app.early_movement.extreme_movement.extreme_movement_shadow_runner import (
     ExtremeMovementShadowRunner,
     ExtremeMovementShadowResult,
 )
+from app.early_movement.extreme_movement.extreme_movement_shadow_logger import (
+    ExtremeMovementShadowLogger,
+)
 
 
 @dataclass(frozen=True)
@@ -141,6 +144,12 @@ class EarlyMovementScannerAutomationCycle:
             ExtremeMovementShadowResult
         ] = None
 
+        self._extreme_shadow_logger = (
+            ExtremeMovementShadowLogger()
+            if self._extreme_shadow_runner is not None
+            else None
+        )
+
     def run(
         self,
     ) -> EarlyMovementScannerAutomationCycleResult:
@@ -162,6 +171,17 @@ class EarlyMovementScannerAutomationCycle:
                 )
             except Exception:
                 self.last_extreme_shadow_result = None
+
+            if (
+                self.last_extreme_shadow_result is not None
+                and self._extreme_shadow_logger is not None
+            ):
+                try:
+                    self._extreme_shadow_logger.log(
+                        self.last_extreme_shadow_result
+                    )
+                except Exception:
+                    pass
 
         chart_loader_stats = None
 
