@@ -105,14 +105,10 @@ class ChartDataCache:
             "timestamp": time.time(),
         }
 
-        self._cache[cache_key] = {
-            "data": data,
-            "timestamp": time.time(),
-        }
-
     @staticmethod
     def _cache_key(
         coin_id: str,
         days: int,
     ) -> str:
         return f"{coin_id}_{days}"
+
