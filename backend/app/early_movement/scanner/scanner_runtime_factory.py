@@ -62,6 +62,9 @@ from app.early_movement.scanner.scanner_rotation_bridge import (
 from app.early_movement.scanner.scanner_active_followup import (
     EarlyMovementScannerActiveFollowup,
 )
+from app.early_movement.extreme_movement.extreme_movement_runtime_bridge import (
+    build_extreme_movement_observation_coordinator,
+)
 
 
 HISTORY_SCOPE_KEY = (
@@ -211,6 +214,11 @@ def build_early_movement_scanner_runtime(
         ),
         active_followup=active_followup,
     )
+    extreme_observation_coordinator = (
+        build_extreme_movement_observation_coordinator(
+            database_url=config.database_url,
+        )
+    )
 
     cycle = (
         EarlyMovementScannerAutomationCycle(
@@ -230,6 +238,9 @@ def build_early_movement_scanner_runtime(
     ),
             history_service=history_service,
             push_service=push_service,
+            extreme_observation_coordinator=(
+                extreme_observation_coordinator
+            ),
         )
     )
 

@@ -7,6 +7,10 @@ from app.early_movement.extreme_movement.extreme_movement_assessment import (
 from app.early_movement.extreme_movement.extreme_movement_evaluator import (
     ExtremeMovementEvaluator,
 )
+from app.early_movement.extreme_movement.extreme_movement_maturity import (
+    ExtremeMovementMaturity,
+    ExtremeMovementMaturityEvaluator,
+)
 from app.early_movement.scanner.scanner_analysis_result import (
     EarlyMovementScannerAnalysisResult,
 )
@@ -18,6 +22,7 @@ class ExtremeMovementAnalysisEntry:
     symbol: str
     name: str
     assessment: ExtremeMovementAssessment
+    maturity: ExtremeMovementMaturity | None = None
 
 
 class ExtremeMovementAnalysisAdapter:
@@ -25,11 +30,18 @@ class ExtremeMovementAnalysisAdapter:
         self,
         *,
         evaluator: ExtremeMovementEvaluator | None = None,
+        maturity_evaluator: ExtremeMovementMaturityEvaluator | None = None,
     ) -> None:
         self._evaluator = (
             evaluator
             if evaluator is not None
             else ExtremeMovementEvaluator()
+        )
+
+        self._maturity_evaluator = (
+            maturity_evaluator
+            if maturity_evaluator is not None
+            else ExtremeMovementMaturityEvaluator()
         )
 
     def adapt(
@@ -48,12 +60,17 @@ class ExtremeMovementAnalysisAdapter:
                 result.analysis.metrics
             )
 
+            maturity = self._maturity_evaluator.evaluate(
+                assessment
+            )
+
             entries.append(
                 ExtremeMovementAnalysisEntry(
                     coin_id=result.coin_id,
                     symbol=result.symbol,
                     name=result.name,
                     assessment=assessment,
+                    maturity=maturity,
                 )
             )
 

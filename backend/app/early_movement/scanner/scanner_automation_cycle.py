@@ -1,4 +1,3 @@
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -42,6 +41,13 @@ from app.early_movement.extreme_movement.extreme_movement_shadow_runner import (
 from app.early_movement.extreme_movement.extreme_movement_shadow_logger import (
     ExtremeMovementShadowLogger,
 )
+from app.early_movement.extreme_movement.extreme_movement_observation_store import (
+    ExtremeMovementObservationCycle,
+    ExtremeMovementObservationStore,
+)
+from app.early_movement.extreme_movement.extreme_movement_observation_coordinator import (
+    ExtremeMovementObservationCoordinator,
+)
 
 
 @dataclass(frozen=True)
@@ -67,8 +73,8 @@ class EarlyMovementScannerAutomationCycleResult:
     ] = ()
 
     push_results: tuple[
-        PushDeliveryBatchResult,
-        ...,
+    PushDeliveryBatchResult,
+    ...,
     ] = ()
 
     chart_loader_stats: Optional[
@@ -117,6 +123,9 @@ class EarlyMovementScannerAutomationCycle:
         chart_stats_provider: Optional[
             Callable[[], ScannerChartLoaderStats]
         ] = None,
+            extreme_observation_coordinator: Optional[
+            ExtremeMovementObservationCoordinator
+        ] = None,
     ) -> None:
         self._scanner = (
             scanner or EarlyMovementScanner()
@@ -150,6 +159,31 @@ class EarlyMovementScannerAutomationCycle:
             else None
         )
 
+        if self._extreme_shadow_runner is not None:
+            if extreme_observation_coordinator is not None:
+                self._extreme_observation_coordinator = (
+                    extreme_observation_coordinator
+                )
+                self._extreme_observation_store = (
+                    extreme_observation_coordinator.observation_store
+                )
+            else:
+                self._extreme_observation_store = (
+                    ExtremeMovementObservationStore()
+                )
+                self._extreme_observation_coordinator = (
+                    ExtremeMovementObservationCoordinator(
+                        observation_store=self._extreme_observation_store,
+                    )
+                )
+        else:
+            self._extreme_observation_store = None
+            self._extreme_observation_coordinator = None
+
+        self.last_extreme_observation_cycle: Optional[
+            ExtremeMovementObservationCycle
+        ] = None
+
     def run(
         self,
     ) -> EarlyMovementScannerAutomationCycleResult:
@@ -161,6 +195,7 @@ class EarlyMovementScannerAutomationCycle:
         scan_result = self._scanner.scan()
 
         self.last_extreme_shadow_result = None
+        self.last_extreme_observation_cycle = None
 
         if self._extreme_shadow_runner is not None:
             try:
@@ -183,6 +218,19 @@ class EarlyMovementScannerAutomationCycle:
                 except Exception:
                     pass
 
+            if (
+                self.last_extreme_shadow_result is not None
+                and self._extreme_observation_coordinator is not None
+            ):
+                try:
+                    self.last_extreme_observation_cycle = (
+                        self._extreme_observation_coordinator.update(
+                            self.last_extreme_shadow_result.entries
+                        )
+                    )
+                except Exception:
+                    self.last_extreme_observation_cycle = None
+
         chart_loader_stats = None
 
         if self._chart_stats_provider is not None:
@@ -196,7 +244,6 @@ class EarlyMovementScannerAutomationCycle:
             )
         )
 
-        
         register_followup = getattr(
             self._scanner,
             "register_followup",
@@ -221,7 +268,6 @@ class EarlyMovementScannerAutomationCycle:
             EarlyMovementDirectionTransition,
             ...,
         ] = ()
-
 
         history_records: tuple[
             EarlyMovementScannerSignalHistoryRecord,
