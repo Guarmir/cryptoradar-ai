@@ -1,3 +1,5 @@
+
+import os
 from typing import Optional
 
 from app.early_movement.scanner.early_movement_scanner import (
@@ -54,8 +56,6 @@ from app.early_movement.scanner.postgresql_scanner_notification_state_store impo
 from app.early_movement.scanner.scanner_push_evolution_guard import (
     EarlyMovementScannerPushEvolutionGuard,
 )
-import os
-
 from app.early_movement.scanner.scanner_rotation_bridge import (
     EarlyMovementScannerRotationBridge,
 )
@@ -65,24 +65,48 @@ from app.early_movement.scanner.scanner_active_followup import (
 from app.early_movement.extreme_movement.extreme_movement_runtime_bridge import (
     build_extreme_movement_observation_coordinator,
 )
-
-
-HISTORY_SCOPE_KEY = (
-    "early-movement-production"
+from app.early_movement.extreme_movement.extreme_movement_shadow_config import (
+    ExtremeMovementShadowConfig,
+)
+from app.early_movement.extreme_movement.extreme_movement_market_provider import (
+    ExtremeMovementMarketProvider,
+)
+from app.early_movement.extreme_movement.extreme_movement_discovery_runner import (
+    ExtremeMovementDiscoveryRunner,
+)
+from app.early_movement.extreme_movement.extreme_movement_discovery_bridge import (
+    ExtremeMovementDiscoveryBridge,
+)
+from app.early_movement.extreme_movement.extreme_movement_discovery_schedule import (
+    ExtremeMovementDiscoverySchedule,
 )
 
-def is_scanner_rotation_enabled() -> bool:
-    value = os.getenv(
-        "EARLY_MOVEMENT_SCANNER_ROTATION_ENABLED",
-        "false",
-    )
 
-    return value.strip().lower() in {
+HISTORY_SCOPE_KEY = "early-movement-production"
+
+
+def _env_enabled(name: str) -> bool:
+    return os.getenv(
+        name,
+        "false",
+    ).strip().lower() in {
         "1",
         "true",
         "yes",
         "on",
     }
+
+
+def is_scanner_rotation_enabled() -> bool:
+    return _env_enabled(
+        "EARLY_MOVEMENT_SCANNER_ROTATION_ENABLED"
+    )
+
+
+def is_extreme_discovery_enabled() -> bool:
+    return _env_enabled(
+        "EXTREME_MOVEMENT_DISCOVERY_ENABLED"
+    )
 
 
 def build_early_movement_scanner_runtime(
@@ -118,81 +142,62 @@ def build_early_movement_scanner_runtime(
             or push_scope_key is None
         ):
             raise ValueError(
-                "Configuracao do push do "
-                "scanner incompleta."
+                "Configuracao do push do scanner incompleta."
             )
 
-        device_store = (
-            PostgreSQLPushDeviceStore(
-                database_url=database_url,
-                scope_key=push_scope_key,
-            )
+        device_store = PostgreSQLPushDeviceStore(
+            database_url=database_url,
+            scope_key=push_scope_key,
         )
 
-        push_sender = (
-            FirebaseAdminPushSender()
+        push_sender = FirebaseAdminPushSender()
+
+        delivery_service = PushDeliveryService(
+            device_store=device_store,
+            push_sender=push_sender,
         )
 
-        delivery_service = (
-            PushDeliveryService(
-                device_store=device_store,
-                push_sender=push_sender,
-            )
-        )
-
-        push_service = (
-            EarlyMovementScannerPushService(
-                cooldown=(
-                    EarlyMovementScannerPushCooldown(
-                        cooldown_seconds=(
-                            config
-                            .push_cooldown_seconds
-                        ),
-                    )
+        push_service = EarlyMovementScannerPushService(
+            cooldown=EarlyMovementScannerPushCooldown(
+                cooldown_seconds=(
+                    config.push_cooldown_seconds
                 ),
-                message_builder=(
-                    EarlyMovementScannerPushMessageBuilder()
-                ),
-                delivery_service=delivery_service,
-                                evolution_guard=(
-                    EarlyMovementScannerPushEvolutionGuard(
-                        state_store=(
-                            PostgreSQLEarlyMovementScannerNotificationStateStore(
-                                database_url=database_url,
-                                scope_key=HISTORY_SCOPE_KEY,
-                            )
-                        ),
-                    )
-                ),
-            )
+            ),
+            message_builder=(
+                EarlyMovementScannerPushMessageBuilder()
+            ),
+            delivery_service=delivery_service,
+            evolution_guard=(
+                EarlyMovementScannerPushEvolutionGuard(
+                    state_store=(
+                        PostgreSQLEarlyMovementScannerNotificationStateStore(
+                            database_url=database_url,
+                            scope_key=HISTORY_SCOPE_KEY,
+                        )
+                    ),
+                )
+            ),
         )
 
     rotation_bridge = None
 
     if is_scanner_rotation_enabled():
-        rotation_bridge = (
-            EarlyMovementScannerRotationBridge(
-                acquisition_budget=4,
-                priority_slots=1,
-            )
+        rotation_bridge = EarlyMovementScannerRotationBridge(
+            acquisition_budget=4,
+            priority_slots=1,
         )
 
-    scanner_chart_loader = (
-        EarlyMovementScannerChartLoader(
-            on_chart_result=(
-                rotation_bridge.on_chart_result
-                if rotation_bridge is not None
-                else None
-            ),
-        )
+    scanner_chart_loader = EarlyMovementScannerChartLoader(
+        on_chart_result=(
+            rotation_bridge.on_chart_result
+            if rotation_bridge is not None
+            else None
+        ),
     )
 
-    followup_enabled = os.getenv(
-        "EARLY_MOVEMENT_SCANNER_FOLLOWUP_ENABLED",
-        "false",
-    ).strip().lower() in {
-        "1", "true", "yes", "on",
-    }
+    followup_enabled = _env_enabled(
+        "EARLY_MOVEMENT_SCANNER_FOLLOWUP_ENABLED"
+    )
 
     active_followup = (
         EarlyMovementScannerActiveFollowup()
@@ -201,11 +206,9 @@ def build_early_movement_scanner_runtime(
     )
 
     scanner = EarlyMovementScanner(
-        deep_analyzer=(
-            EarlyMovementScannerDeepAnalyzer(
-                chart_loader=scanner_chart_loader,
-                max_chart_age_seconds=7200,
-            )
+        deep_analyzer=EarlyMovementScannerDeepAnalyzer(
+            chart_loader=scanner_chart_loader,
+            max_chart_age_seconds=7200,
         ),
         candidate_arranger=(
             rotation_bridge.arrange
@@ -214,41 +217,60 @@ def build_early_movement_scanner_runtime(
         ),
         active_followup=active_followup,
     )
+
     extreme_observation_coordinator = (
         build_extreme_movement_observation_coordinator(
             database_url=config.database_url,
         )
     )
 
-    cycle = (
-        EarlyMovementScannerAutomationCycle(
-            scanner=scanner,
-            on_cycle_start=(
-                scanner_chart_loader.reset_budget
-            ),
-            chart_stats_provider=(
-                lambda: scanner_chart_loader.stats
-            ),
-    alert_decision_maker=(
-        EarlyMovementScannerAlertDecisionMaker(
-            enable_early_observation=(
-                config.early_observation_enabled
-            ),
+    extreme_discovery_bridge = None
+
+    if (
+        ExtremeMovementShadowConfig.is_enabled()
+        and is_extreme_discovery_enabled()
+    ):
+        extreme_discovery_bridge = (
+            ExtremeMovementDiscoveryBridge(
+                discovery_runner=ExtremeMovementDiscoveryRunner(
+                    market_provider=ExtremeMovementMarketProvider(
+                        start_page=2,
+                        page_count=2,
+                    ),
+                    max_analysis_candidates=2,
+                ),
+                schedule=ExtremeMovementDiscoverySchedule(
+                    interval_seconds=900,
+                ),
+            )
         )
-    ),
-            history_service=history_service,
-            push_service=push_service,
-            extreme_observation_coordinator=(
-                extreme_observation_coordinator
-            ),
-        )
+
+    cycle = EarlyMovementScannerAutomationCycle(
+        scanner=scanner,
+        on_cycle_start=scanner_chart_loader.reset_budget,
+        chart_stats_provider=(
+            lambda: scanner_chart_loader.stats
+        ),
+        alert_decision_maker=(
+            EarlyMovementScannerAlertDecisionMaker(
+                enable_early_observation=(
+                    config.early_observation_enabled
+                ),
+            )
+        ),
+        history_service=history_service,
+        push_service=push_service,
+        extreme_observation_coordinator=(
+            extreme_observation_coordinator
+        ),
+        extreme_discovery_bridge=(
+            extreme_discovery_bridge
+        ),
     )
 
     scheduler = EarlyMovementScannerScheduler(
         cycle=cycle,
-        interval_seconds=(
-            config.interval_seconds
-        ),
+        interval_seconds=config.interval_seconds,
     )
 
     return EarlyMovementScannerRuntime(

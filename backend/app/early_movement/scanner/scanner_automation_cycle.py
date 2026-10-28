@@ -1,3 +1,4 @@
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -48,6 +49,9 @@ from app.early_movement.extreme_movement.extreme_movement_observation_store impo
 from app.early_movement.extreme_movement.extreme_movement_observation_coordinator import (
     ExtremeMovementObservationCoordinator,
 )
+from app.early_movement.extreme_movement.extreme_movement_discovery_bridge import (
+    ExtremeMovementDiscoveryBridge,
+)
 
 
 @dataclass(frozen=True)
@@ -70,11 +74,6 @@ class EarlyMovementScannerAutomationCycleResult:
     push_results: tuple[
         PushDeliveryBatchResult,
         ...,
-    ] = ()
-
-    push_results: tuple[
-    PushDeliveryBatchResult,
-    ...,
     ] = ()
 
     chart_loader_stats: Optional[
@@ -123,25 +122,29 @@ class EarlyMovementScannerAutomationCycle:
         chart_stats_provider: Optional[
             Callable[[], ScannerChartLoaderStats]
         ] = None,
-            extreme_observation_coordinator: Optional[
+        extreme_observation_coordinator: Optional[
             ExtremeMovementObservationCoordinator
+        ] = None,
+        extreme_discovery_bridge: Optional[
+            ExtremeMovementDiscoveryBridge
         ] = None,
     ) -> None:
         self._scanner = (
-            scanner or EarlyMovementScanner()
+            scanner
+            if scanner is not None
+            else EarlyMovementScanner()
         )
 
         self._alert_decision_maker = (
             alert_decision_maker
-            or EarlyMovementScannerAlertDecisionMaker()
+            if alert_decision_maker is not None
+            else EarlyMovementScannerAlertDecisionMaker()
         )
 
         self._history_service = history_service
         self._push_service = push_service
         self._on_cycle_start = on_cycle_start
-        self._chart_stats_provider = (
-            chart_stats_provider
-        )
+        self._chart_stats_provider = chart_stats_provider
 
         self._extreme_shadow_runner = (
             ExtremeMovementShadowRunner()
@@ -149,9 +152,17 @@ class EarlyMovementScannerAutomationCycle:
             else None
         )
 
+        self._extreme_discovery_bridge = (
+            extreme_discovery_bridge
+            if self._extreme_shadow_runner is not None
+            else None
+        )
+
         self.last_extreme_shadow_result: Optional[
             ExtremeMovementShadowResult
         ] = None
+
+        self.last_extreme_discovery_result = None
 
         self._extreme_shadow_logger = (
             ExtremeMovementShadowLogger()
@@ -195,6 +206,7 @@ class EarlyMovementScannerAutomationCycle:
         scan_result = self._scanner.scan()
 
         self.last_extreme_shadow_result = None
+        self.last_extreme_discovery_result = None
         self.last_extreme_observation_cycle = None
 
         if self._extreme_shadow_runner is not None:
@@ -230,6 +242,31 @@ class EarlyMovementScannerAutomationCycle:
                     )
                 except Exception:
                     self.last_extreme_observation_cycle = None
+
+            if self._extreme_discovery_bridge is not None:
+                try:
+                    excluded_coin_ids = {
+                        result.coin_id
+                        for result in scan_result.analysis_results
+                    }
+
+                    self.last_extreme_discovery_result = (
+                        self._extreme_discovery_bridge.run_if_due(
+                            excluded_coin_ids=excluded_coin_ids,
+                        )
+                    )
+
+                    if (
+                        self.last_extreme_discovery_result is not None
+                        and self._extreme_observation_coordinator is not None
+                    ):
+                        self.last_extreme_observation_cycle = (
+                            self._extreme_observation_coordinator.update(
+                                self.last_extreme_discovery_result.shadow.entries
+                            )
+                        )
+                except Exception:
+                    self.last_extreme_discovery_result = None
 
         chart_loader_stats = None
 

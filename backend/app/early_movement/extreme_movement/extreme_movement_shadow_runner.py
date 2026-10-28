@@ -68,3 +68,34 @@ class ExtremeMovementShadowRunner:
             ),
             entries=entries,
         )
+   
+    def run_analysis_results(
+        self,
+        analysis_results: tuple,
+    ) -> ExtremeMovementShadowResult:
+        entries = self._adapter.adapt(
+            analysis_results
+        )
+
+        states = [
+            entry.assessment.state
+            for entry in entries
+        ]
+
+        return ExtremeMovementShadowResult(
+            analyzed_count=len(analysis_results),
+            evaluated_count=len(entries),
+            extreme_acceleration_count=states.count(
+                "extreme_acceleration"
+            ),
+            movement_pressure_count=states.count(
+                "movement_pressure"
+            ),
+            possible_reversal_count=states.count(
+                "possible_reversal"
+            ),
+            insufficient_evidence_count=states.count(
+                "insufficient_evidence"
+            ),
+            entries=entries,
+        )
