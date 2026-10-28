@@ -37,3 +37,9 @@ def isolate_coingecko_coordinator(monkeypatch):
         "coingecko_request_coordinator",
         coordinator,
     )
+
+    monkeypatch.setattr(
+        "app.services.coingecko_controlled_request."
+        "coingecko_request_coordinator",
+        coordinator,
+    )
