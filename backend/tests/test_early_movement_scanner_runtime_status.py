@@ -97,7 +97,6 @@ def test_runtime_status_with_completed_cycle() -> None:
         last_cycle["started_at"]
         == "2026-09-30T10:00:00+00:00"
     )
-
     assert (
         last_cycle["finished_at"]
         == "2026-09-30T10:00:05+00:00"
@@ -125,6 +124,7 @@ def test_extreme_discovery_enabled_without_result() -> None:
         "enabled": True,
         "last_run_available": False,
         "last_error": None,
+        "last_error_message": None,
     }
 
 
@@ -162,6 +162,7 @@ def test_extreme_discovery_with_completed_result() -> None:
     assert extreme["enabled"] is True
     assert extreme["last_run_available"] is True
     assert extreme["last_error"] is None
+    assert extreme["last_error_message"] is None
     assert extreme["universe_size"] == 500
     assert extreme["candidate_count"] == 12
     assert extreme["analyzed_count"] == 2
@@ -188,6 +189,7 @@ def test_extreme_discovery_with_error() -> None:
     assert extreme["enabled"] is True
     assert extreme["last_run_available"] is False
     assert extreme["last_error"] == "RuntimeError"
+    assert extreme["last_error_message"] is None
 
 
 def test_extreme_discovery_disabled() -> None:
@@ -201,4 +203,69 @@ def test_extreme_discovery_disabled() -> None:
         "enabled": False,
         "last_run_available": False,
         "last_error": None,
+        "last_error_message": None,
     }
+
+
+def test_extreme_discovery_coingecko_rate_limit() -> None:
+    bridge = SimpleNamespace(
+        last_result=None,
+        last_error=RuntimeError(
+            "Limite temporário da CoinGecko atingido."
+        ),
+    )
+
+    runtime = make_runtime(bridge=bridge)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    extreme = status["extreme_discovery"]
+
+    assert extreme["last_error"] == "RuntimeError"
+    assert extreme["last_error_message"] == (
+        "Limite temporário da CoinGecko atingido."
+    )
+
+
+def test_extreme_discovery_coingecko_http_error() -> None:
+    bridge = SimpleNamespace(
+        last_result=None,
+        last_error=RuntimeError(
+            "Falha ao buscar universo de mercado. HTTP 403."
+        ),
+    )
+
+    runtime = make_runtime(bridge=bridge)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    extreme = status["extreme_discovery"]
+
+    assert extreme["last_error_message"] == (
+        "Falha ao buscar universo de mercado. HTTP 403."
+    )
+
+
+def test_extreme_discovery_invalid_market_response() -> None:
+    bridge = SimpleNamespace(
+        last_result=None,
+        last_error=RuntimeError(
+            "Resposta complementar de mercado inválida."
+        ),
+    )
+
+    runtime = make_runtime(bridge=bridge)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    extreme = status["extreme_discovery"]
+
+    assert extreme["last_error_message"] == (
+        "Resposta complementar de mercado inválida."
+    )

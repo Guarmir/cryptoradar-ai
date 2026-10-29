@@ -6,6 +6,26 @@ from app.early_movement.scanner.scanner_runtime import (
 )
 
 
+def _safe_discovery_error_message(error: Exception) -> Optional[str]:
+    message = str(error)
+
+    if message == "Limite temporário da CoinGecko atingido.":
+        return message
+
+    if message == "Resposta complementar de mercado inválida.":
+        return message
+
+    if message.startswith("Falha ao buscar universo de mercado. HTTP "):
+        status_code = message.removeprefix(
+            "Falha ao buscar universo de mercado. HTTP "
+        ).removesuffix(".")
+
+        if status_code.isdigit():
+            return f"Falha ao buscar universo de mercado. HTTP {status_code}."
+
+    return None
+
+
 def build_early_movement_scanner_runtime_status(
     runtime: Optional[EarlyMovementScannerRuntime],
 ) -> dict[str, Any]:
@@ -78,6 +98,7 @@ def build_early_movement_scanner_runtime_status(
         "enabled": bridge is not None,
         "last_run_available": False,
         "last_error": None,
+        "last_error_message": None,
     }
 
     if bridge is not None:
@@ -87,6 +108,9 @@ def build_early_movement_scanner_runtime_status(
         if last_error is not None:
             discovery_status["last_error"] = (
                 last_error.__class__.__name__
+            )
+            discovery_status["last_error_message"] = (
+                _safe_discovery_error_message(last_error)
             )
 
         if last_result is not None:
