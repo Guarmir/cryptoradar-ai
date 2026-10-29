@@ -1,13 +1,41 @@
+
+from datetime import datetime, timezone
+from types import SimpleNamespace
+
 from app.early_movement.scanner.scanner_runtime_status import (
     build_early_movement_scanner_runtime_status,
 )
 
 
+def make_runtime(
+    *,
+    bridge=None,
+    include_cycle=True,
+):
+    cycle = SimpleNamespace(
+        _extreme_discovery_bridge=bridge,
+    )
+
+    scheduler_data = {
+        "interval_seconds": 600.0,
+        "last_cycle_result": None,
+        "last_scheduler_error": None,
+    }
+
+    if include_cycle:
+        scheduler_data["cycle"] = cycle
+
+    scheduler = SimpleNamespace(**scheduler_data)
+
+    return SimpleNamespace(
+        is_running=True,
+        scheduler=scheduler,
+    )
+
+
 def test_runtime_status_when_disabled() -> None:
-    status = (
-        build_early_movement_scanner_runtime_status(
-            None,
-        )
+    status = build_early_movement_scanner_runtime_status(
+        None,
     )
 
     assert status == {
@@ -18,27 +46,15 @@ def test_runtime_status_when_disabled() -> None:
         "last_scheduler_error": None,
     }
 
-from datetime import datetime, timezone
-from types import SimpleNamespace
-
 
 def test_runtime_status_with_completed_cycle() -> None:
     started_at = datetime(
-        2026,
-        9,
-        30,
-        10,
-        0,
+        2026, 9, 30, 10, 0,
         tzinfo=timezone.utc,
     )
 
     finished_at = datetime(
-        2026,
-        9,
-        30,
-        10,
-        0,
-        5,
+        2026, 9, 30, 10, 0, 5,
         tzinfo=timezone.utc,
     )
 
@@ -65,10 +81,8 @@ def test_runtime_status_with_completed_cycle() -> None:
         scheduler=scheduler,
     )
 
-    status = (
-        build_early_movement_scanner_runtime_status(
-            runtime,
-        )
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
     )
 
     assert status["enabled"] is True
@@ -93,3 +107,98 @@ def test_runtime_status_with_completed_cycle() -> None:
     assert last_cycle["should_alert"] is True
     assert last_cycle["push_batch_count"] == 2
     assert last_cycle["delivered_push_count"] == 1
+
+
+def test_extreme_discovery_enabled_without_result() -> None:
+    bridge = SimpleNamespace(
+        last_result=None,
+        last_error=None,
+    )
+
+    runtime = make_runtime(bridge=bridge)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    assert status["extreme_discovery"] == {
+        "enabled": True,
+        "last_run_available": False,
+        "last_error": None,
+    }
+
+
+def test_extreme_discovery_with_completed_result() -> None:
+    discovery = SimpleNamespace(
+        universe_size=500,
+        candidate_count=12,
+        analyzed_count=2,
+        successful_analysis_count=2,
+    )
+
+    shadow = SimpleNamespace(
+        entries=(
+            SimpleNamespace(),
+            SimpleNamespace(),
+        ),
+    )
+
+    bridge = SimpleNamespace(
+        last_result=SimpleNamespace(
+            discovery=discovery,
+            shadow=shadow,
+        ),
+        last_error=None,
+    )
+
+    runtime = make_runtime(bridge=bridge)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    extreme = status["extreme_discovery"]
+
+    assert extreme["enabled"] is True
+    assert extreme["last_run_available"] is True
+    assert extreme["last_error"] is None
+    assert extreme["universe_size"] == 500
+    assert extreme["candidate_count"] == 12
+    assert extreme["analyzed_count"] == 2
+    assert extreme["successful_analysis_count"] == 2
+    assert extreme["shadow_entry_count"] == 2
+
+
+def test_extreme_discovery_with_error() -> None:
+    bridge = SimpleNamespace(
+        last_result=None,
+        last_error=RuntimeError(
+            "Falha na descoberta"
+        ),
+    )
+
+    runtime = make_runtime(bridge=bridge)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    extreme = status["extreme_discovery"]
+
+    assert extreme["enabled"] is True
+    assert extreme["last_run_available"] is False
+    assert extreme["last_error"] == "RuntimeError"
+
+
+def test_extreme_discovery_disabled() -> None:
+    runtime = make_runtime(bridge=None)
+
+    status = build_early_movement_scanner_runtime_status(
+        runtime,
+    )
+
+    assert status["extreme_discovery"] == {
+        "enabled": False,
+        "last_run_available": False,
+        "last_error": None,
+    }
