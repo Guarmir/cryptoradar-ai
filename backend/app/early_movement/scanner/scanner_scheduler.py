@@ -49,6 +49,14 @@ class EarlyMovementScannerScheduler:
         return self._interval_seconds
 
     @property
+    def cycle(self) -> EarlyMovementScannerAutomationCycle:
+        return self._cycle
+
+    @property
+    def cycle(self) -> EarlyMovementScannerAutomationCycle:
+        return self._cycle
+
+    @property
     def is_running(
         self,
     ) -> bool:
