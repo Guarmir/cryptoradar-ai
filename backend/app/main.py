@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,6 +19,9 @@ from app.services.routes.asset_router import (
 )
 from app.services.routes.early_movement_scanner_router import (
     create_early_movement_scanner_router,
+)
+from app.services.routes.extreme_movement_router import (
+    create_extreme_movement_router,
 )
 from app.services.routes.push_router import (
     create_push_router,
@@ -60,6 +64,10 @@ app.include_router(
 
 app.include_router(
     create_early_movement_scanner_router()
+)
+
+app.include_router(
+    create_extreme_movement_router()
 )
 
 
