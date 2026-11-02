@@ -1,3 +1,4 @@
+
 from types import SimpleNamespace
 
 from app.early_movement.early_movement_metrics import (
@@ -23,12 +24,13 @@ def make_result(
     analysis_available: bool = True,
     recent_return: float = 8.0,
     acceleration: float = 4.0,
+    current_price: float = 1.0,
 ):
     asset = EarlyMovementScannerMarketAsset(
         coin_id=coin_id,
         symbol=coin_id.upper(),
         name=coin_id,
-        current_price=1.0,
+        current_price=current_price,
         total_volume=1_000_000.0,
         market_cap=10_000_000.0,
         price_change_percentage_24h=20.0,
@@ -73,6 +75,20 @@ def test_adapts_existing_analysis():
     )
 
 
+def test_preserves_market_price():
+    adapter = ExtremeMovementAnalysisAdapter()
+
+    entries = adapter.adapt([
+        make_result(
+            "irys",
+            current_price=0.028821,
+        ),
+    ])
+
+    assert len(entries) == 1
+    assert entries[0].current_price == 0.028821
+
+
 def test_skips_unavailable_analysis():
     adapter = ExtremeMovementAnalysisAdapter()
 
@@ -90,17 +106,23 @@ def test_preserves_multiple_assets():
     adapter = ExtremeMovementAnalysisAdapter()
 
     entries = adapter.adapt([
-        make_result("coin-a"),
+        make_result(
+            "coin-a",
+            current_price=0.50,
+        ),
         make_result(
             "coin-b",
             recent_return=-8.0,
             acceleration=-4.0,
+            current_price=2.75,
         ),
     ])
 
     assert len(entries) == 2
     assert entries[0].coin_id == "coin-a"
     assert entries[1].coin_id == "coin-b"
+    assert entries[0].current_price == 0.50
+    assert entries[1].current_price == 2.75
     assert entries[1].assessment.direction == "down"
 
 

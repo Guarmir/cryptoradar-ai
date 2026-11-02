@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 from collections.abc import Iterable
 
@@ -23,6 +24,7 @@ class ExtremeMovementAnalysisEntry:
     name: str
     assessment: ExtremeMovementAssessment
     maturity: ExtremeMovementMaturity | None = None
+    current_price: float | None = None
 
 
 class ExtremeMovementAnalysisAdapter:
@@ -71,6 +73,9 @@ class ExtremeMovementAnalysisAdapter:
                     name=result.name,
                     assessment=assessment,
                     maturity=maturity,
+                    current_price=(
+                        result.candidate.asset.current_price
+                    ),
                 )
             )
 

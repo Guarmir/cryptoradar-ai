@@ -22,6 +22,11 @@ class ExtremeMovementActiveRecord:
     last_observed_at: datetime
     observation_status: str = "active"
 
+    discovery_price: float | None = None
+    discovery_price_at: datetime | None = None
+    latest_price: float | None = None
+    latest_price_at: datetime | None = None
+
 
 class PostgreSQLExtremeMovementActiveStore:
     TABLE_NAME = (
@@ -52,7 +57,31 @@ class PostgreSQLExtremeMovementActiveStore:
         self._scope_key = scope_key
         self._connection_factory = connection_factory
 
-    
+    @staticmethod
+    def _validate_price(
+        price: float | None,
+        timestamp: datetime | None,
+        field_name: str,
+    ) -> None:
+        if (price is None) != (timestamp is None):
+            raise ValueError(
+                f"{field_name}: preco e horario devem "
+                "ser informados juntos."
+            )
+
+        if price is not None and price <= 0:
+            raise ValueError(
+                f"{field_name}: preco deve ser positivo."
+            )
+
+        if timestamp is not None and (
+            timestamp.tzinfo is None
+            or timestamp.utcoffset() is None
+        ):
+            raise ValueError(
+                f"{field_name}: horario precisa de fuso."
+            )
+
     def save(
         self,
         record: ExtremeMovementActiveRecord,
@@ -88,6 +117,17 @@ class PostgreSQLExtremeMovementActiveStore:
                 "Status de observacao invalido."
             )
 
+        self._validate_price(
+            record.discovery_price,
+            record.discovery_price_at,
+            "discovery_price",
+        )
+        self._validate_price(
+            record.latest_price,
+            record.latest_price_at,
+            "latest_price",
+        )
+
         owns_connection = connection is None
 
         if owns_connection:
@@ -112,12 +152,17 @@ class PostgreSQLExtremeMovementActiveStore:
                         observation_status,
                         missed_cycles,
                         first_observed_at,
-                        last_observed_at
+                        last_observed_at,
+                        discovery_price,
+                        discovery_price_at,
+                        latest_price,
+                        latest_price_at
                     )
                     VALUES (
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
-                        %s, %s, %s
+                        %s, %s, %s, %s, %s,
+                        %s, %s
                     )
                     ON CONFLICT (scope_key, coin_id)
                     DO UPDATE SET
@@ -134,6 +179,22 @@ class PostgreSQLExtremeMovementActiveStore:
                         missed_cycles = EXCLUDED.missed_cycles,
                         last_observed_at =
                             EXCLUDED.last_observed_at,
+                        discovery_price = COALESCE(
+                            {self.TABLE_NAME}.discovery_price,
+                            EXCLUDED.discovery_price
+                        ),
+                        discovery_price_at = COALESCE(
+                            {self.TABLE_NAME}.discovery_price_at,
+                            EXCLUDED.discovery_price_at
+                        ),
+                        latest_price = COALESCE(
+                            EXCLUDED.latest_price,
+                            {self.TABLE_NAME}.latest_price
+                        ),
+                        latest_price_at = COALESCE(
+                            EXCLUDED.latest_price_at,
+                            {self.TABLE_NAME}.latest_price_at
+                        ),
                         updated_at = NOW()
                     """,
                     (
@@ -150,6 +211,10 @@ class PostgreSQLExtremeMovementActiveStore:
                         record.missed_cycles,
                         record.first_observed_at,
                         record.last_observed_at,
+                        record.discovery_price,
+                        record.discovery_price_at,
+                        record.latest_price,
+                        record.latest_price_at,
                     ),
                 )
 
@@ -167,7 +232,6 @@ class PostgreSQLExtremeMovementActiveStore:
         finally:
             if owns_connection:
                 connection.close()
-
 
     def load_active(
         self,
@@ -192,7 +256,11 @@ class PostgreSQLExtremeMovementActiveStore:
                         observation_status,
                         missed_cycles,
                         first_observed_at,
-                        last_observed_at
+                        last_observed_at,
+                        discovery_price,
+                        discovery_price_at,
+                        latest_price,
+                        latest_price_at
                     FROM {self.TABLE_NAME}
                     WHERE scope_key = %s
                       AND observation_status IN (
@@ -246,6 +314,10 @@ class PostgreSQLExtremeMovementActiveStore:
             missed_cycles,
             first_observed_at,
             last_observed_at,
+            discovery_price,
+            discovery_price_at,
+            latest_price,
+            latest_price_at,
         ) = row
 
         assessment = ExtremeMovementAssessment(
@@ -267,6 +339,7 @@ class PostgreSQLExtremeMovementActiveStore:
             name=name,
             assessment=assessment,
             maturity=maturity,
+            current_price=latest_price,
         )
 
         return ExtremeMovementActiveRecord(
@@ -275,4 +348,8 @@ class PostgreSQLExtremeMovementActiveStore:
             first_observed_at=first_observed_at,
             last_observed_at=last_observed_at,
             observation_status=observation_status,
+            discovery_price=discovery_price,
+            discovery_price_at=discovery_price_at,
+            latest_price=latest_price,
+            latest_price_at=latest_price_at,
         )

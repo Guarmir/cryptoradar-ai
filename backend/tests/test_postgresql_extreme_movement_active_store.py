@@ -32,6 +32,10 @@ def make_record(
     *,
     status="active",
     missed_cycles=0,
+    discovery_price=None,
+    discovery_price_at=None,
+    latest_price=None,
+    latest_price_at=None,
 ):
     assessment = ExtremeMovementAssessment(
         state="movement_pressure",
@@ -52,6 +56,7 @@ def make_record(
         name="Bitcoin",
         assessment=assessment,
         maturity=maturity,
+        current_price=latest_price,
     )
 
     return ExtremeMovementActiveRecord(
@@ -60,6 +65,10 @@ def make_record(
         first_observed_at=FIRST_OBSERVED,
         last_observed_at=LAST_OBSERVED,
         observation_status=status,
+        discovery_price=discovery_price,
+        discovery_price_at=discovery_price_at,
+        latest_price=latest_price,
+        latest_price_at=latest_price_at,
     )
 
 
@@ -93,6 +102,10 @@ def make_row(record):
         record.missed_cycles,
         record.first_observed_at,
         record.last_observed_at,
+        record.discovery_price,
+        record.discovery_price_at,
+        record.latest_price,
+        record.latest_price_at,
     )
 
 
@@ -109,6 +122,7 @@ def test_save_active_record():
     assert params[0] == "extreme-movement-shadow"
     assert params[1] == "bitcoin"
     assert params[9] == "active"
+    assert len(params) == 17
 
     connection.commit.assert_called_once()
     connection.close.assert_called_once()
@@ -130,6 +144,55 @@ def test_save_awaiting_update_record():
     assert params[10] == 3
 
     connection.commit.assert_called_once()
+
+
+def test_save_and_load_prices():
+    store, connection, cursor = make_store()
+
+    record = make_record(
+        discovery_price=0.0285,
+        discovery_price_at=FIRST_OBSERVED,
+        latest_price=0.0292,
+        latest_price_at=LAST_OBSERVED,
+    )
+
+    store.save(record)
+
+    sql, params = cursor.execute.call_args.args
+
+    assert "discovery_price" in sql
+    assert "latest_price" in sql
+    assert "COALESCE" in sql
+    assert params[13:] == (
+        0.0285,
+        FIRST_OBSERVED,
+        0.0292,
+        LAST_OBSERVED,
+    )
+
+    cursor.fetchall.return_value = [
+        make_row(record)
+    ]
+
+    restored = store.load_active()
+
+    assert restored == (record,)
+    assert restored[0].entry.current_price == 0.0292
+
+
+def test_legacy_record_without_prices():
+    store, _, cursor = make_store()
+    record = make_record()
+
+    cursor.fetchall.return_value = [
+        make_row(record)
+    ]
+
+    restored = store.load_active()
+
+    assert restored == (record,)
+    assert restored[0].discovery_price is None
+    assert restored[0].latest_price is None
 
 
 def test_save_rolls_back_on_error():
@@ -269,5 +332,32 @@ def test_rejects_invalid_dates():
 
     with pytest.raises(ValueError):
         store.save(invalid_record)
+
+    connection.cursor.assert_not_called()
+
+
+def test_rejects_incomplete_price():
+    store, connection, _ = make_store()
+
+    with pytest.raises(ValueError):
+        store.save(
+            make_record(
+                discovery_price=0.0285,
+            )
+        )
+
+    connection.cursor.assert_not_called()
+
+
+def test_rejects_invalid_price():
+    store, connection, _ = make_store()
+
+    with pytest.raises(ValueError):
+        store.save(
+            make_record(
+                latest_price=-1.0,
+                latest_price_at=LAST_OBSERVED,
+            )
+        )
 
     connection.cursor.assert_not_called()

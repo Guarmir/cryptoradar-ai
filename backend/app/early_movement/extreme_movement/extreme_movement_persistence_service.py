@@ -32,7 +32,9 @@ class ExtremeMovementPersistenceService:
         self._history_store = history_store
         self._active_store = active_store
         self._connection_factory = connection_factory
-        self._active_records: dict[str, ExtremeMovementActiveRecord] = {}
+        self._active_records: dict[
+            str, ExtremeMovementActiveRecord
+        ] = {}
         self._restored = False
 
     def restore(self) -> bool:
@@ -122,21 +124,47 @@ class ExtremeMovementPersistenceService:
             coin_id = asset.coin_id
             previous = self._active_records.get(coin_id)
 
+            if previous is not None:
+                first_observed_at = previous.first_observed_at
+                discovery_price = previous.discovery_price
+                discovery_price_at = previous.discovery_price_at
+                latest_price = previous.latest_price
+                latest_price_at = previous.latest_price_at
+            else:
+                first_observed_at = timestamp
+                discovery_price = None
+                discovery_price_at = None
+                latest_price = None
+                latest_price_at = None
+
             if coin_id in observed_coin_ids:
-                first_observed_at = (
-                    previous.first_observed_at
-                    if previous is not None
-                    else timestamp
-                )
                 last_observed_at = timestamp
                 status = "active"
+
+                observed_price = asset.last_entry.current_price
+
+                if observed_price is not None:
+                    # Registros novos recebem preco inicial.
+                    # Registros antigos nao ganham
+                    # um preco historico inventado.
+                    if previous is None:
+                        discovery_price = observed_price
+                        discovery_price_at = timestamp
+
+                    # Atualiza somente quando existe
+                    # uma observacao com preco valido.
+                    latest_price = observed_price
+                    latest_price_at = timestamp
+
             else:
                 if previous is None:
                     continue
 
-                first_observed_at = previous.first_observed_at
                 last_observed_at = previous.last_observed_at
                 status = "awaiting_update"
+
+                # Sem observacao nova, conserva
+                # os precos e horarios anteriores.
 
             active_records.append(
                 ExtremeMovementActiveRecord(
@@ -145,6 +173,10 @@ class ExtremeMovementPersistenceService:
                     first_observed_at=first_observed_at,
                     last_observed_at=last_observed_at,
                     observation_status=status,
+                    discovery_price=discovery_price,
+                    discovery_price_at=discovery_price_at,
+                    latest_price=latest_price,
+                    latest_price_at=latest_price_at,
                 )
             )
 
@@ -182,4 +214,6 @@ class ExtremeMovementPersistenceService:
 
         # Atualiza a memoria somente apos o commit.
         for record in active_records:
-            self._active_records[record.entry.coin_id] = record
+            self._active_records[
+                record.entry.coin_id
+            ] = record

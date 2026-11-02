@@ -34,7 +34,6 @@ def create_extreme_movement_router() -> APIRouter:
             )
 
             records = store.load_active()
-
             observations = []
 
             for record in records:
@@ -61,6 +60,22 @@ def create_extreme_movement_router() -> APIRouter:
                         ),
                         "last_observed_at": (
                             record.last_observed_at.isoformat()
+                        ),
+                        "discovery_price": (
+                            record.discovery_price
+                        ),
+                        "discovery_price_at": (
+                            record.discovery_price_at.isoformat()
+                            if record.discovery_price_at is not None
+                            else None
+                        ),
+                        "latest_price": (
+                            record.latest_price
+                        ),
+                        "latest_price_at": (
+                            record.latest_price_at.isoformat()
+                            if record.latest_price_at is not None
+                            else None
                         ),
                     }
                 )
