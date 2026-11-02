@@ -1,4 +1,5 @@
-﻿from dataclasses import dataclass
+﻿
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from app.early_movement.extreme_movement.extreme_movement_discovery_schedule import (
@@ -7,6 +8,9 @@ from app.early_movement.extreme_movement.extreme_movement_discovery_schedule imp
 from app.early_movement.extreme_movement.extreme_movement_discovery_runner import (
     ExtremeMovementDiscoveryRunner,
     ExtremeMovementDiscoveryResult,
+)
+from app.early_movement.extreme_movement.extreme_movement_discovery_trace import (
+    ExtremeMovementDiscoveryTrace,
 )
 from app.early_movement.extreme_movement.extreme_movement_shadow_runner import (
     ExtremeMovementShadowRunner,
@@ -27,6 +31,7 @@ class ExtremeMovementDiscoveryBridge:
         discovery_runner: ExtremeMovementDiscoveryRunner,
         shadow_runner: Optional[ExtremeMovementShadowRunner] = None,
         schedule: Optional[ExtremeMovementDiscoverySchedule] = None,
+        trace_store: Optional[Any] = None,
     ) -> None:
         self._discovery_runner = discovery_runner
         self._shadow_runner = (
@@ -39,11 +44,13 @@ class ExtremeMovementDiscoveryBridge:
             if schedule is not None
             else ExtremeMovementDiscoverySchedule()
         )
+        self._trace_store = trace_store
 
         self.last_result: Optional[
             ExtremeMovementDiscoveryBridgeResult
         ] = None
         self.last_error: Optional[Exception] = None
+        self.last_trace_error: Optional[Exception] = None
 
     def run_if_due(
         self,
@@ -54,11 +61,14 @@ class ExtremeMovementDiscoveryBridge:
             return None
 
         self.last_error = None
+        self.last_trace_error = None
 
         try:
             discovery = self._discovery_runner.run(
                 excluded_coin_ids=excluded_coin_ids,
             )
+
+            self._save_discovery_trace(discovery)
 
             shadow = self._shadow_runner.run_analysis_results(
                 discovery.analysis_results
@@ -75,3 +85,19 @@ class ExtremeMovementDiscoveryBridge:
         except Exception as error:
             self.last_error = error
             return None
+
+    def _save_discovery_trace(
+        self,
+        discovery: ExtremeMovementDiscoveryResult,
+    ) -> None:
+        if self._trace_store is None:
+            return
+
+        try:
+            trace = ExtremeMovementDiscoveryTrace.from_result(
+                discovery
+            )
+            self._trace_store.save(trace)
+
+        except Exception as error:
+            self.last_trace_error = error

@@ -80,9 +80,13 @@ from app.early_movement.extreme_movement.extreme_movement_discovery_bridge impor
 from app.early_movement.extreme_movement.extreme_movement_discovery_schedule import (
     ExtremeMovementDiscoverySchedule,
 )
+from app.early_movement.extreme_movement.postgresql_extreme_movement_discovery_trace_store import (
+    PostgreSQLExtremeMovementDiscoveryTraceStore,
+)
 
 
 HISTORY_SCOPE_KEY = "early-movement-production"
+EXTREME_MOVEMENT_SCOPE_KEY = "extreme-movement-shadow"
 
 
 def _env_enabled(name: str) -> bool:
@@ -230,6 +234,19 @@ def build_early_movement_scanner_runtime(
         ExtremeMovementShadowConfig.is_enabled()
         and is_extreme_discovery_enabled()
     ):
+        trace_store = None
+
+        if (
+            config.database_url is not None
+            and config.database_url.strip()
+        ):
+            trace_store = (
+                PostgreSQLExtremeMovementDiscoveryTraceStore(
+                    database_url=config.database_url,
+                    scope_key=EXTREME_MOVEMENT_SCOPE_KEY,
+                )
+            )
+
         extreme_discovery_bridge = (
             ExtremeMovementDiscoveryBridge(
                 discovery_runner=ExtremeMovementDiscoveryRunner(
@@ -242,6 +259,7 @@ def build_early_movement_scanner_runtime(
                 schedule=ExtremeMovementDiscoverySchedule(
                     interval_seconds=900,
                 ),
+                trace_store=trace_store,
             )
         )
 

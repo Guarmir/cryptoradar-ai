@@ -1,10 +1,15 @@
-﻿from types import SimpleNamespace
+﻿
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 from app.early_movement.extreme_movement.extreme_movement_discovery_bridge import (
     ExtremeMovementDiscoveryBridge,
 )
 from app.early_movement.extreme_movement.extreme_movement_discovery_schedule import (
     ExtremeMovementDiscoverySchedule,
+)
+from app.early_movement.extreme_movement.extreme_movement_discovery_trace import (
+    ExtremeMovementDiscoveryTrace,
 )
 
 
@@ -15,9 +20,20 @@ class FakeDiscoveryRunner:
 
     def run(self, *, excluded_coin_ids=None):
         self.calls.append(set(excluded_coin_ids or set()))
+
         if self.fail:
             raise RuntimeError("Falha simulada na descoberta")
-        return SimpleNamespace(analysis_results=("analysis-a",))
+
+        return SimpleNamespace(
+            universe_size=500,
+            candidate_count=3,
+            analyzed_count=2,
+            excluded_count=1,
+            selected_coin_ids=("coin-a", "coin-b", "coin-c"),
+            submitted_coin_ids=("coin-a", "coin-b"),
+            not_submitted_coin_ids=("coin-c",),
+            analysis_results=("analysis-a",),
+        )
 
 
 class FakeShadowRunner:
@@ -29,18 +45,36 @@ class FakeShadowRunner:
         return SimpleNamespace(entries=("entry-a",))
 
 
+def make_bridge(
+    discovery,
+    shadow,
+    *,
+    clock=None,
+    trace_store=None,
+):
+    if clock is None:
+        clock = [0.0]
+
+    return ExtremeMovementDiscoveryBridge(
+        discovery_runner=discovery,
+        shadow_runner=shadow,
+        trace_store=trace_store,
+        schedule=ExtremeMovementDiscoverySchedule(
+            interval_seconds=900,
+            clock=lambda: clock[0],
+        ),
+    )
+
+
 def test_bridge_runs_when_due_and_excludes_existing_coins():
     clock = [0.0]
     discovery = FakeDiscoveryRunner()
     shadow = FakeShadowRunner()
 
-    bridge = ExtremeMovementDiscoveryBridge(
-        discovery_runner=discovery,
-        shadow_runner=shadow,
-        schedule=ExtremeMovementDiscoverySchedule(
-            interval_seconds=900,
-            clock=lambda: clock[0],
-        ),
+    bridge = make_bridge(
+        discovery,
+        shadow,
+        clock=clock,
     )
 
     result = bridge.run_if_due(
@@ -56,6 +90,7 @@ def test_bridge_runs_when_due_and_excludes_existing_coins():
     assert len(discovery.calls) == 1
 
     clock[0] = 900.0
+
     assert bridge.run_if_due() is not None
     assert len(discovery.calls) == 2
 
@@ -65,13 +100,10 @@ def test_bridge_isolates_discovery_failures():
     discovery = FakeDiscoveryRunner(fail=True)
     shadow = FakeShadowRunner()
 
-    bridge = ExtremeMovementDiscoveryBridge(
-        discovery_runner=discovery,
-        shadow_runner=shadow,
-        schedule=ExtremeMovementDiscoverySchedule(
-            interval_seconds=900,
-            clock=lambda: clock[0],
-        ),
+    bridge = make_bridge(
+        discovery,
+        shadow,
+        clock=clock,
     )
 
     assert bridge.run_if_due() is None
@@ -79,5 +111,96 @@ def test_bridge_isolates_discovery_failures():
     assert shadow.calls == []
 
     clock[0] = 100.0
+
     assert bridge.run_if_due() is None
     assert len(discovery.calls) == 1
+
+
+def test_bridge_saves_discovery_trace():
+    discovery = FakeDiscoveryRunner()
+    shadow = FakeShadowRunner()
+    trace_store = Mock()
+
+    bridge = make_bridge(
+        discovery,
+        shadow,
+        trace_store=trace_store,
+    )
+
+    result = bridge.run_if_due()
+
+    assert result is not None
+    assert bridge.last_error is None
+    assert bridge.last_trace_error is None
+
+    trace_store.save.assert_called_once()
+
+    trace = trace_store.save.call_args.args[0]
+
+    assert isinstance(trace, ExtremeMovementDiscoveryTrace)
+    assert trace.universe_size == 500
+    assert trace.candidate_count == 3
+    assert trace.analyzed_count == 2
+    assert trace.excluded_count == 1
+    assert trace.selected_coin_ids == (
+        "coin-a",
+        "coin-b",
+        "coin-c",
+    )
+    assert trace.submitted_coin_ids == (
+        "coin-a",
+        "coin-b",
+    )
+    assert trace.not_submitted_coin_ids == ("coin-c",)
+
+    assert shadow.calls == [("analysis-a",)]
+
+
+def test_bridge_continues_when_trace_storage_fails():
+    discovery = FakeDiscoveryRunner()
+    shadow = FakeShadowRunner()
+    trace_store = Mock()
+
+    trace_store.save.side_effect = RuntimeError(
+        "Falha simulada no Neon"
+    )
+
+    bridge = make_bridge(
+        discovery,
+        shadow,
+        trace_store=trace_store,
+    )
+
+    result = bridge.run_if_due()
+
+    assert result is not None
+    assert result.shadow.entries == ("entry-a",)
+    assert bridge.last_error is None
+
+    assert isinstance(
+        bridge.last_trace_error,
+        RuntimeError,
+    )
+
+    trace_store.save.assert_called_once()
+    assert shadow.calls == [("analysis-a",)]
+
+
+def test_bridge_does_not_save_trace_when_discovery_fails():
+    discovery = FakeDiscoveryRunner(fail=True)
+    shadow = FakeShadowRunner()
+    trace_store = Mock()
+
+    bridge = make_bridge(
+        discovery,
+        shadow,
+        trace_store=trace_store,
+    )
+
+    result = bridge.run_if_due()
+
+    assert result is None
+    assert isinstance(bridge.last_error, RuntimeError)
+
+    trace_store.save.assert_not_called()
+    assert shadow.calls == []

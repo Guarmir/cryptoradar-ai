@@ -26,6 +26,11 @@ class ExtremeMovementDiscoveryResult:
     analyzed_count: int
     analysis_results: tuple
 
+    selected_coin_ids: tuple[str, ...] = ()
+    submitted_coin_ids: tuple[str, ...] = ()
+    not_submitted_coin_ids: tuple[str, ...] = ()
+    excluded_count: int = 0
+
 
 class ExtremeMovementDiscoveryRunner:
     def __init__(
@@ -110,6 +115,12 @@ class ExtremeMovementDiscoveryRunner:
             else set()
         )
 
+        excluded_count = sum(
+            1
+            for asset in assets
+            if asset.coin_id in excluded
+        )
+
         eligible_assets = tuple(
             asset
             for asset in assets
@@ -156,6 +167,24 @@ class ExtremeMovementDiscoveryRunner:
                 )
             )
 
+        selected_coin_ids = tuple(
+            item.coin_id
+            for item in selected
+        )
+
+        submitted_coin_ids = tuple(
+            candidate.coin_id
+            for candidate in candidates
+        )
+
+        submitted_set = set(submitted_coin_ids)
+
+        not_submitted_coin_ids = tuple(
+            coin_id
+            for coin_id in selected_coin_ids
+            if coin_id not in submitted_set
+        )
+
         analysis_results = tuple(
             self._deep_analyzer.analyze_candidates(
                 candidates
@@ -167,4 +196,10 @@ class ExtremeMovementDiscoveryRunner:
             candidate_count=len(selected),
             analyzed_count=len(analysis_results),
             analysis_results=analysis_results,
+            selected_coin_ids=selected_coin_ids,
+            submitted_coin_ids=submitted_coin_ids,
+            not_submitted_coin_ids=(
+                not_submitted_coin_ids
+            ),
+            excluded_count=excluded_count,
         )

@@ -172,3 +172,47 @@ def test_excludes_assets_already_analyzed_by_conservative_scanner():
     assert result.analyzed_count == 1
     assert analyzer.received[0].coin_id == "coin-c"
 
+    
+def test_records_discovery_candidate_trace():
+    provider = FakeMarketProvider(
+        [
+            make_asset("coin-a", 30),
+            make_asset("coin-b", 20),
+            make_asset("coin-c", 15),
+            make_asset("coin-d", 2),
+        ]
+    )
+    analyzer = FakeDeepAnalyzer()
+
+    runner = ExtremeMovementDiscoveryRunner(
+        market_provider=provider,
+        deep_analyzer=analyzer,
+        max_analysis_candidates=1,
+    )
+
+    result = runner.run(
+        excluded_coin_ids={"coin-a"},
+    )
+
+    assert result.universe_size == 4
+    assert result.excluded_count == 1
+    assert result.candidate_count == 2
+
+    assert result.selected_coin_ids == (
+        "coin-b",
+        "coin-c",
+    )
+
+    assert result.submitted_coin_ids == (
+        "coin-b",
+    )
+
+    assert result.not_submitted_coin_ids == (
+        "coin-c",
+    )
+
+    assert result.analyzed_count == 1
+    assert provider.calls == 1
+    assert analyzer.calls == 1
+
+
