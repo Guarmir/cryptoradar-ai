@@ -93,3 +93,67 @@ def test_rejects_empty_scope():
             database_url="postgresql://test",
             scope_key=" ",
         )
+
+        
+def test_saves_experimental_comparison_fields():
+    from dataclasses import replace
+
+    connection = MagicMock()
+    cursor = connection.cursor.return_value
+
+    trace = replace(
+        make_trace(),
+        experimental_status="completed",
+        experimental_coin_ids=("coin-a", "coin-b"),
+        experimental_only_coin_ids=("coin-b",),
+        common_coin_ids=("coin-a",),
+        experimental_priorities=(
+            {
+                "coin_id": "coin-b",
+                "score": 76.0,
+                "state": "priority",
+                "direction": "up",
+                "evidence_count": 3,
+            },
+        ),
+    )
+
+    make_store(connection).save(trace)
+
+    cursor.execute.assert_called_once()
+    sql, params = cursor.execute.call_args.args
+
+    assert "experimental_status" in sql
+    assert "experimental_coin_ids" in sql
+    assert "experimental_only_coin_ids" in sql
+    assert "common_coin_ids" in sql
+    assert "experimental_priorities" in sql
+
+    assert len(params) == 14
+    assert params[9] == "completed"
+
+    assert isinstance(params[10], Jsonb)
+    assert params[10].obj == ["coin-a", "coin-b"]
+
+    assert isinstance(params[11], Jsonb)
+    assert params[11].obj == ["coin-b"]
+
+    assert isinstance(params[12], Jsonb)
+    assert params[12].obj == ["coin-a"]
+
+    assert isinstance(params[13], Jsonb)
+    assert params[13].obj == [
+        {
+            "coin_id": "coin-b",
+            "score": 76.0,
+            "state": "priority",
+            "direction": "up",
+            "evidence_count": 3,
+        }
+    ]
+
+    connection.commit.assert_called_once()
+    connection.rollback.assert_not_called()
+    cursor.close.assert_called_once()
+    connection.close.assert_called_once()
+

@@ -39,10 +39,8 @@ class PostgreSQLExtremeMovementDiscoveryTraceStore:
         self._scope_key = scope_key
         self._connection_factory = connection_factory
 
-    def save(
-        self,
-        trace: ExtremeMovementDiscoveryTrace,
-    ) -> None:
+    
+    def save(self, trace: ExtremeMovementDiscoveryTrace) -> None:
         connection = self._connect()
 
         try:
@@ -60,11 +58,16 @@ class PostgreSQLExtremeMovementDiscoveryTraceStore:
                         excluded_count,
                         selected_coin_ids,
                         submitted_coin_ids,
-                        not_submitted_coin_ids
+                        not_submitted_coin_ids,
+                        experimental_status,
+                        experimental_coin_ids,
+                        experimental_only_coin_ids,
+                        common_coin_ids,
+                        experimental_priorities
                     )
                     VALUES (
-                        %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s
                     )
                     """,
                     (
@@ -77,6 +80,11 @@ class PostgreSQLExtremeMovementDiscoveryTraceStore:
                         Jsonb(list(trace.selected_coin_ids)),
                         Jsonb(list(trace.submitted_coin_ids)),
                         Jsonb(list(trace.not_submitted_coin_ids)),
+                        trace.experimental_status,
+                        Jsonb(list(trace.experimental_coin_ids)),
+                        Jsonb(list(trace.experimental_only_coin_ids)),
+                        Jsonb(list(trace.common_coin_ids)),
+                        Jsonb(list(trace.experimental_priorities)),
                     ),
                 )
 
@@ -91,6 +99,7 @@ class PostgreSQLExtremeMovementDiscoveryTraceStore:
 
         finally:
             connection.close()
+
 
     def _connect(self):
         if self._connection_factory is not None:

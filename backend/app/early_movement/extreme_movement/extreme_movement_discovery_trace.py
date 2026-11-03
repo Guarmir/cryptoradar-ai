@@ -18,12 +18,23 @@ class ExtremeMovementDiscoveryTrace:
     submitted_coin_ids: tuple[str, ...]
     not_submitted_coin_ids: tuple[str, ...]
 
+    
+    experimental_status: str = "not_available"
+    experimental_coin_ids: tuple[str, ...] = ()
+    experimental_only_coin_ids: tuple[str, ...] = ()
+    common_coin_ids: tuple[str, ...] = ()
+    experimental_priorities: tuple = ()
+
+
+   
     @classmethod
     def from_result(
         cls,
         result: ExtremeMovementDiscoveryResult,
         *,
         observed_at: datetime | None = None,
+        experimental_comparison=None,
+        experimental_error: Exception | None = None,
     ) -> "ExtremeMovementDiscoveryTrace":
         timestamp = (
             observed_at
@@ -39,6 +50,34 @@ class ExtremeMovementDiscoveryTrace:
                 "observed_at precisa conter fuso horario."
             )
 
+        if experimental_error is not None:
+            experimental_status = "error"
+        elif experimental_comparison is not None:
+            experimental_status = "completed"
+        else:
+            experimental_status = "not_available"
+
+        comparison = (
+            experimental_comparison
+            if experimental_status == "completed"
+            else None
+        )
+
+        priorities = (
+            tuple(
+                {
+                    "coin_id": item.coin_id,
+                    "score": item.score,
+                    "state": item.state,
+                    "direction": item.direction,
+                    "evidence_count": item.evidence_count,
+                }
+                for item in comparison.experimental_priorities
+            )
+            if comparison is not None
+            else ()
+        )
+
         return cls(
             observed_at=timestamp,
             universe_size=result.universe_size,
@@ -50,4 +89,22 @@ class ExtremeMovementDiscoveryTrace:
             not_submitted_coin_ids=(
                 result.not_submitted_coin_ids
             ),
+            experimental_status=experimental_status,
+            experimental_coin_ids=(
+                comparison.experimental_coin_ids
+                if comparison is not None
+                else ()
+            ),
+            experimental_only_coin_ids=(
+                comparison.experimental_only_coin_ids
+                if comparison is not None
+                else ()
+            ),
+            common_coin_ids=(
+                comparison.common_coin_ids
+                if comparison is not None
+                else ()
+            ),
+            experimental_priorities=priorities,
         )
+

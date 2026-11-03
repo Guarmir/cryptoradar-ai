@@ -52,3 +52,55 @@ def test_rejects_timestamp_without_timezone():
             make_result(),
             observed_at=timestamp,
         )
+
+        
+def test_trace_preserves_experimental_comparison():
+    from types import SimpleNamespace
+
+    comparison = SimpleNamespace(
+        experimental_coin_ids=("coin-a", "coin-b"),
+        experimental_only_coin_ids=("coin-b",),
+        common_coin_ids=("coin-a",),
+        experimental_priorities=(
+            SimpleNamespace(
+                coin_id="coin-b",
+                score=76.0,
+                state="priority",
+                direction="up",
+                evidence_count=3,
+            ),
+        ),
+    )
+
+    result = SimpleNamespace(
+        universe_size=500,
+        candidate_count=20,
+        analyzed_count=2,
+        excluded_count=10,
+        selected_coin_ids=("coin-a",),
+        submitted_coin_ids=("coin-a",),
+        not_submitted_coin_ids=(),
+    )
+
+    trace = ExtremeMovementDiscoveryTrace.from_result(
+        result,
+        experimental_comparison=comparison,
+    )
+
+    assert trace.experimental_status == "completed"
+    assert trace.experimental_coin_ids == (
+        "coin-a",
+        "coin-b",
+    )
+    assert trace.experimental_only_coin_ids == ("coin-b",)
+    assert trace.common_coin_ids == ("coin-a",)
+    assert trace.experimental_priorities == (
+        {
+            "coin_id": "coin-b",
+            "score": 76.0,
+            "state": "priority",
+            "direction": "up",
+            "evidence_count": 3,
+        },
+    )
+

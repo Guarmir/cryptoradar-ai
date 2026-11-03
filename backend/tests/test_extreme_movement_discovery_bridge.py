@@ -204,3 +204,53 @@ def test_bridge_does_not_save_trace_when_discovery_fails():
 
     trace_store.save.assert_not_called()
     assert shadow.calls == []
+
+    
+def test_bridge_saves_experimental_comparison():
+    from types import SimpleNamespace
+
+    discovery = FakeDiscoveryRunner()
+    shadow = FakeShadowRunner()
+    trace_store = Mock()
+
+    discovery.last_experimental_comparison = SimpleNamespace(
+        experimental_coin_ids=("coin-a", "coin-b"),
+        experimental_only_coin_ids=("coin-b",),
+        common_coin_ids=("coin-a",),
+        experimental_priorities=(
+            SimpleNamespace(
+                coin_id="coin-b",
+                score=76.0,
+                state="priority",
+                direction="up",
+                evidence_count=3,
+            ),
+        ),
+    )
+    discovery.last_experimental_error = None
+
+    bridge = make_bridge(
+        discovery,
+        shadow,
+        trace_store=trace_store,
+    )
+
+    result = bridge.run_if_due()
+
+    assert result is not None
+    assert bridge.last_error is None
+    assert bridge.last_trace_error is None
+
+    trace_store.save.assert_called_once()
+    trace = trace_store.save.call_args.args[0]
+
+    assert trace.experimental_status == "completed"
+    assert trace.experimental_coin_ids == (
+        "coin-a",
+        "coin-b",
+    )
+    assert trace.experimental_only_coin_ids == ("coin-b",)
+    assert trace.common_coin_ids == ("coin-a",)
+    assert trace.experimental_priorities[0]["score"] == 76.0
+    assert trace.experimental_priorities[0]["direction"] == "up"
+

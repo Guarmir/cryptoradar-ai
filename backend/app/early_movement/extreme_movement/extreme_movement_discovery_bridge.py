@@ -95,8 +95,19 @@ class ExtremeMovementDiscoveryBridge:
 
         try:
             trace = ExtremeMovementDiscoveryTrace.from_result(
-                discovery
+                discovery,
+                experimental_comparison=getattr(
+                    self._discovery_runner,
+                    "last_experimental_comparison",
+                    None,
+                ),
+                experimental_error=getattr(
+                    self._discovery_runner,
+                    "last_experimental_error",
+                    None,
+                ),
             )
+
             self._trace_store.save(trace)
 
         except Exception as error:
