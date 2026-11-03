@@ -2,6 +2,10 @@
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from app.early_movement.extreme_movement.extreme_movement_candidate_comparator import (
+    ExtremeMovementCandidateComparator,
+    ExtremeMovementCandidateComparison,
+)
 from app.early_movement.extreme_movement.extreme_movement_candidate_selector import (
     ExtremeMovementCandidateSelector,
 )
@@ -47,6 +51,9 @@ class ExtremeMovementDiscoveryRunner:
             EarlyMovementScannerDeepAnalyzer
         ] = None,
         max_analysis_candidates: int = 2,
+        experimental_comparator: Optional[
+            ExtremeMovementCandidateComparator
+        ] = None,
     ) -> None:
         if max_analysis_candidates < 1:
             raise ValueError(
@@ -94,6 +101,21 @@ class ExtremeMovementDiscoveryRunner:
             max_analysis_candidates
         )
 
+        self._experimental_comparator = (
+            experimental_comparator
+            if experimental_comparator is not None
+            else ExtremeMovementCandidateComparator(
+                selector=self._candidate_selector,
+            )
+        )
+
+        self.last_experimental_comparison: Optional[
+            ExtremeMovementCandidateComparison
+        ] = None
+        self.last_experimental_error: Optional[
+            Exception
+        ] = None
+
     def run(
         self,
         *,
@@ -126,6 +148,20 @@ class ExtremeMovementDiscoveryRunner:
             for asset in assets
             if asset.coin_id not in excluded
         )
+
+        # Comparação experimental isolada.
+        # Não altera a seleção ativa.
+        self.last_experimental_comparison = None
+        self.last_experimental_error = None
+
+        try:
+            self.last_experimental_comparison = (
+                self._experimental_comparator.compare(
+                    eligible_assets,
+                )
+            )
+        except Exception as error:
+            self.last_experimental_error = error
 
         selected = tuple(
             self._candidate_selector.select(
