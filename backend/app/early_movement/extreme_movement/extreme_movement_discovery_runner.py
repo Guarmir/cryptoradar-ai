@@ -1,5 +1,6 @@
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.early_movement.extreme_movement.extreme_movement_candidate_comparator import (
@@ -8,6 +9,9 @@ from app.early_movement.extreme_movement.extreme_movement_candidate_comparator i
 )
 from app.early_movement.extreme_movement.extreme_movement_candidate_selector import (
     ExtremeMovementCandidateSelector,
+)
+from app.early_movement.extreme_movement.extreme_movement_experimental_tracking_coordinator import (
+    ExtremeMovementExperimentalTrackingCoordinator,
 )
 from app.early_movement.liquidity.liquidity_evaluator import (
     EarlyMovementLiquidityEvaluator,
@@ -53,6 +57,9 @@ class ExtremeMovementDiscoveryRunner:
         max_analysis_candidates: int = 2,
         experimental_comparator: Optional[
             ExtremeMovementCandidateComparator
+        ] = None,
+        experimental_tracking_coordinator: Optional[
+            ExtremeMovementExperimentalTrackingCoordinator
         ] = None,
     ) -> None:
         if max_analysis_candidates < 1:
@@ -109,10 +116,19 @@ class ExtremeMovementDiscoveryRunner:
             )
         )
 
+        self._experimental_tracking_coordinator = (
+            experimental_tracking_coordinator
+        )
+
         self.last_experimental_comparison: Optional[
             ExtremeMovementCandidateComparison
         ] = None
+
         self.last_experimental_error: Optional[
+            Exception
+        ] = None
+
+        self.last_experimental_tracking_error: Optional[
             Exception
         ] = None
 
@@ -130,6 +146,8 @@ class ExtremeMovementDiscoveryRunner:
         assets = tuple(
             self._market_provider.fetch()
         )
+
+        observed_at = datetime.now(timezone.utc)
 
         excluded = (
             excluded_coin_ids
@@ -149,10 +167,11 @@ class ExtremeMovementDiscoveryRunner:
             if asset.coin_id not in excluded
         )
 
-        # Comparação experimental isolada.
-        # Não altera a seleção ativa.
+        # Comparacao experimental isolada.
+        # Nao altera a selecao ativa.
         self.last_experimental_comparison = None
         self.last_experimental_error = None
+        self.last_experimental_tracking_error = None
 
         try:
             self.last_experimental_comparison = (
@@ -162,6 +181,22 @@ class ExtremeMovementDiscoveryRunner:
             )
         except Exception as error:
             self.last_experimental_error = error
+
+        # Acompanhamento experimental opcional.
+        # Reutiliza os dados de mercado ja coletados.
+        # Uma falha aqui nao interrompe a analise principal.
+        if (
+            self._experimental_tracking_coordinator is not None
+            and self.last_experimental_comparison is not None
+        ):
+            try:
+                self._experimental_tracking_coordinator.process(
+                    eligible_assets,
+                    self.last_experimental_comparison,
+                    observed_at=observed_at,
+                )
+            except Exception as error:
+                self.last_experimental_tracking_error = error
 
         selected = tuple(
             self._candidate_selector.select(

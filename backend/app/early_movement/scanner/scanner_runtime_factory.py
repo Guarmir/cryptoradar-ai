@@ -83,6 +83,12 @@ from app.early_movement.extreme_movement.extreme_movement_discovery_schedule imp
 from app.early_movement.extreme_movement.postgresql_extreme_movement_discovery_trace_store import (
     PostgreSQLExtremeMovementDiscoveryTraceStore,
 )
+from app.early_movement.extreme_movement.extreme_movement_experimental_tracking_coordinator import (
+    ExtremeMovementExperimentalTrackingCoordinator,
+)
+from app.early_movement.extreme_movement.postgresql_extreme_movement_experimental_tracking_store import (
+    PostgreSQLExtremeMovementExperimentalTrackingStore,
+)
 
 
 HISTORY_SCOPE_KEY = "early-movement-production"
@@ -247,6 +253,32 @@ def build_early_movement_scanner_runtime(
                 )
             )
 
+        experimental_tracking_coordinator = None
+
+        if _env_enabled(
+            "EXTREME_MOVEMENT_EXPERIMENTAL_TRACKING_ENABLED"
+        ):
+            if (
+                config.database_url is None
+                or not config.database_url.strip()
+            ):
+                raise ValueError(
+                    "Tracking experimental exige DATABASE_URL."
+                )
+
+            tracking_store = (
+                PostgreSQLExtremeMovementExperimentalTrackingStore(
+                    database_url=config.database_url,
+                    scope_key=EXTREME_MOVEMENT_SCOPE_KEY,
+                )
+            )
+
+            experimental_tracking_coordinator = (
+                ExtremeMovementExperimentalTrackingCoordinator(
+                    store=tracking_store,
+                )
+            )
+
         extreme_discovery_bridge = (
             ExtremeMovementDiscoveryBridge(
                 discovery_runner=ExtremeMovementDiscoveryRunner(
@@ -255,6 +287,9 @@ def build_early_movement_scanner_runtime(
                         page_count=2,
                     ),
                     max_analysis_candidates=2,
+                    experimental_tracking_coordinator=(
+                        experimental_tracking_coordinator
+                    ),
                 ),
                 schedule=ExtremeMovementDiscoverySchedule(
                     interval_seconds=900,

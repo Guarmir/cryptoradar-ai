@@ -407,4 +407,111 @@ def test_real_comparator_detects_candidate_between_cycles():
     assert provider.calls == 2
     assert analyzer.calls == 2
 
+# Integracao opcional do acompanhamento experimental.
+class FakeExperimentalTrackingCoordinator:
+    def __init__(self, error=None):
+        self.calls = []
+        self.error = error
 
+    def process(self, assets, comparison, *, observed_at):
+        self.calls.append((tuple(assets), comparison, observed_at))
+        if self.error is not None:
+            raise self.error
+
+
+def test_tracking_receives_same_market_snapshot_without_extra_fetch():
+    from datetime import datetime, timezone
+
+    provider = FakeMarketProvider([
+        make_asset("coin-a", 30),
+        make_asset("coin-b", 20),
+    ])
+    comparator = FakeExperimentalComparator()
+    coordinator = FakeExperimentalTrackingCoordinator()
+    analyzer = FakeDeepAnalyzer()
+    runner = ExtremeMovementDiscoveryRunner(
+        market_provider=provider,
+        deep_analyzer=analyzer,
+        experimental_comparator=comparator,
+        experimental_tracking_coordinator=coordinator,
+    )
+
+    result = runner.run(excluded_coin_ids={"coin-a"})
+
+    assert provider.calls == 1
+    assert comparator.calls == 1
+    assert len(coordinator.calls) == 1
+    assets, comparison, observed_at = coordinator.calls[0]
+    assert tuple(asset.coin_id for asset in assets) == ("coin-b",)
+    assert assets == comparator.received[0]
+    assert comparison is runner.last_experimental_comparison
+    assert observed_at.tzinfo is not None
+    assert observed_at.utcoffset() is not None
+    assert result.selected_coin_ids == ("coin-b",)
+    assert runner.last_experimental_tracking_error is None
+
+
+def test_tracking_failure_does_not_interrupt_discovery():
+    provider = FakeMarketProvider([make_asset("coin-a", 20)])
+    analyzer = FakeDeepAnalyzer()
+    coordinator = FakeExperimentalTrackingCoordinator(
+        error=RuntimeError("Neon indisponivel")
+    )
+    runner = ExtremeMovementDiscoveryRunner(
+        market_provider=provider,
+        deep_analyzer=analyzer,
+        experimental_comparator=FakeExperimentalComparator(),
+        experimental_tracking_coordinator=coordinator,
+    )
+
+    result = runner.run()
+
+    assert result.analyzed_count == 1
+    assert result.submitted_coin_ids == ("coin-a",)
+    assert analyzer.calls == 1
+    assert provider.calls == 1
+    assert len(coordinator.calls) == 1
+    assert isinstance(runner.last_experimental_tracking_error, RuntimeError)
+    assert runner.last_experimental_error is None
+
+
+def test_comparison_failure_skips_tracking():
+    provider = FakeMarketProvider([make_asset("coin-a", 20)])
+    coordinator = FakeExperimentalTrackingCoordinator()
+    runner = ExtremeMovementDiscoveryRunner(
+        market_provider=provider,
+        deep_analyzer=FakeDeepAnalyzer(),
+        experimental_comparator=FailingExperimentalComparator(),
+        experimental_tracking_coordinator=coordinator,
+    )
+
+    result = runner.run()
+
+    assert result.analyzed_count == 1
+    assert coordinator.calls == []
+    assert isinstance(runner.last_experimental_error, RuntimeError)
+    assert runner.last_experimental_tracking_error is None
+
+
+def test_tracking_error_cleared_on_next_cycle():
+    provider = FakeMarketProvider([make_asset("coin-a", 20)])
+    coordinator = FakeExperimentalTrackingCoordinator(
+        error=RuntimeError("falha temporaria")
+    )
+    runner = ExtremeMovementDiscoveryRunner(
+        market_provider=provider,
+        deep_analyzer=FakeDeepAnalyzer(),
+        experimental_comparator=FakeExperimentalComparator(),
+        experimental_tracking_coordinator=coordinator,
+    )
+
+    runner.run()
+    assert isinstance(runner.last_experimental_tracking_error, RuntimeError)
+
+    coordinator.error = None
+    result = runner.run()
+
+    assert result.analyzed_count == 1
+    assert len(coordinator.calls) == 2
+    assert provider.calls == 2
+    assert runner.last_experimental_tracking_error is None
