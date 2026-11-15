@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -18,15 +17,12 @@ class ExtremeMovementDiscoveryTrace:
     submitted_coin_ids: tuple[str, ...]
     not_submitted_coin_ids: tuple[str, ...]
 
-    
     experimental_status: str = "not_available"
     experimental_coin_ids: tuple[str, ...] = ()
     experimental_only_coin_ids: tuple[str, ...] = ()
     common_coin_ids: tuple[str, ...] = ()
     experimental_priorities: tuple = ()
 
-
-   
     @classmethod
     def from_result(
         cls,
@@ -42,10 +38,7 @@ class ExtremeMovementDiscoveryTrace:
             else datetime.now(timezone.utc)
         )
 
-        if (
-            timestamp.tzinfo is None
-            or timestamp.utcoffset() is None
-        ):
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError(
                 "observed_at precisa conter fuso horario."
             )
@@ -63,20 +56,44 @@ class ExtremeMovementDiscoveryTrace:
             else None
         )
 
-        priorities = (
-            tuple(
-                {
+        if comparison is not None:
+            # Diagnostico independente da selecao. So adicionamos dados
+            # direcionais ao JSONB de prioridades dos ativos selecionados.
+            # Os demais ativos continuam disponiveis no comparador em memoria.
+            directional_by_id = {
+                item.coin_id: item
+                for item in getattr(comparison, "directional_continuities", ())
+            }
+
+            priorities = []
+            for item in comparison.experimental_priorities:
+                entry = {
                     "coin_id": item.coin_id,
                     "score": item.score,
                     "state": item.state,
                     "direction": item.direction,
                     "evidence_count": item.evidence_count,
                 }
-                for item in comparison.experimental_priorities
-            )
-            if comparison is not None
-            else ()
-        )
+
+                directional = directional_by_id.get(item.coin_id)
+                if directional is not None:
+                    entry["directional_continuity"] = {
+                        "state": directional.state,
+                        "direction": directional.direction,
+                        "previous_direction": directional.previous_direction,
+                        "observation_count": directional.observation_count,
+                        "consecutive_moves": directional.consecutive_moves,
+                        "alternating_moves": directional.alternating_moves,
+                        "latest_price_change_pct": (
+                            directional.latest_price_change_pct
+                        ),
+                    }
+
+                priorities.append(entry)
+
+            experimental_priorities = tuple(priorities)
+        else:
+            experimental_priorities = ()
 
         return cls(
             observed_at=timestamp,
@@ -86,9 +103,7 @@ class ExtremeMovementDiscoveryTrace:
             excluded_count=result.excluded_count,
             selected_coin_ids=result.selected_coin_ids,
             submitted_coin_ids=result.submitted_coin_ids,
-            not_submitted_coin_ids=(
-                result.not_submitted_coin_ids
-            ),
+            not_submitted_coin_ids=result.not_submitted_coin_ids,
             experimental_status=experimental_status,
             experimental_coin_ids=(
                 comparison.experimental_coin_ids
@@ -105,6 +120,5 @@ class ExtremeMovementDiscoveryTrace:
                 if comparison is not None
                 else ()
             ),
-            experimental_priorities=priorities,
+            experimental_priorities=experimental_priorities,
         )
-

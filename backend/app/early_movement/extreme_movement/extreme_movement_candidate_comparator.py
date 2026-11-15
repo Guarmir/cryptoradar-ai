@@ -1,4 +1,3 @@
-
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,6 +12,10 @@ from app.early_movement.extreme_movement.extreme_movement_candidate_selector imp
 from app.early_movement.extreme_movement.extreme_movement_candidate_tracker import (
     ExtremeMovementCandidateTracker,
 )
+from app.early_movement.extreme_movement.extreme_movement_directional_continuity import (
+    ExtremeMovementDirectionalContinuity,
+    ExtremeMovementDirectionalContinuityEvaluator,
+)
 from app.early_movement.scanner.scanner_market_asset import (
     EarlyMovementScannerMarketAsset,
 )
@@ -25,9 +28,9 @@ class ExtremeMovementCandidateComparison:
     common_coin_ids: tuple[str, ...]
     experimental_only_coin_ids: tuple[str, ...]
     current_only_coin_ids: tuple[str, ...]
-    experimental_priorities: tuple[
-        ExtremeMovementCandidatePriority, ...
-    ]
+    experimental_priorities: tuple[ExtremeMovementCandidatePriority, ...]
+    # Diagnostico adicional. Nao participa da selecao nem da persistencia.
+    directional_continuities: tuple[ExtremeMovementDirectionalContinuity, ...] = ()
 
 
 class ExtremeMovementCandidateComparator:
@@ -37,6 +40,7 @@ class ExtremeMovementCandidateComparator:
         selector: ExtremeMovementCandidateSelector | None = None,
         tracker: ExtremeMovementCandidateTracker | None = None,
         evaluator: ExtremeMovementCandidatePriorityEvaluator | None = None,
+        directional_evaluator: ExtremeMovementDirectionalContinuityEvaluator | None = None,
     ) -> None:
         self._selector = (
             selector
@@ -46,15 +50,16 @@ class ExtremeMovementCandidateComparator:
                 min_total_volume=100_000.0,
             )
         )
-        self._tracker = (
-            tracker
-            if tracker is not None
-            else ExtremeMovementCandidateTracker()
-        )
+        self._tracker = tracker if tracker is not None else ExtremeMovementCandidateTracker()
         self._evaluator = (
             evaluator
             if evaluator is not None
             else ExtremeMovementCandidatePriorityEvaluator()
+        )
+        self._directional_evaluator = (
+            directional_evaluator
+            if directional_evaluator is not None
+            else ExtremeMovementDirectionalContinuityEvaluator()
         )
 
     def compare(
@@ -73,10 +78,7 @@ class ExtremeMovementCandidateComparator:
             market_assets,
             limit=limit,
         )
-
-        current_ids = tuple(
-            item.coin_id for item in current
-        )
+        current_ids = tuple(item.coin_id for item in current)
 
         evolutions = self._tracker.observe(
             market_assets,
@@ -92,41 +94,46 @@ class ExtremeMovementCandidateComparator:
             (
                 item
                 for item in priorities
-                if item.evidence_count >= 2
-                and item.score >= 20.0
+                if item.evidence_count >= 2 and item.score >= 20.0
             ),
-            key=lambda item: (
-                -item.score,
-                item.coin_id,
-            ),
+            key=lambda item: (-item.score, item.coin_id),
         )
 
         experimental = tuple(ranked[:limit])
-
-        experimental_ids = tuple(
-            item.coin_id for item in experimental
-        )
+        experimental_ids = tuple(item.coin_id for item in experimental)
 
         current_set = set(current_ids)
         experimental_set = set(experimental_ids)
+
+        # Executado depois da selecao original e apenas sobre o historico
+        # ja coletado. O resultado e um diagnostico paralelo em memoria.
+        # Suporta trackers injetados mais antigos que nao expõem get_history.
+        directional_continuities: list[ExtremeMovementDirectionalContinuity] = []
+        get_history = getattr(self._tracker, "get_history", None)
+        if callable(get_history):
+            for evolution in evolutions:
+                try:
+                    history = get_history(evolution.coin_id)
+                    if history:
+                        directional_continuities.append(
+                            self._directional_evaluator.evaluate(history)
+                        )
+                except (ValueError, ArithmeticError):
+                    # Historico inadequado nao deve interferir na selecao.
+                    continue
 
         return ExtremeMovementCandidateComparison(
             current_coin_ids=current_ids,
             experimental_coin_ids=experimental_ids,
             common_coin_ids=tuple(
-                coin_id
-                for coin_id in experimental_ids
-                if coin_id in current_set
+                coin_id for coin_id in experimental_ids if coin_id in current_set
             ),
             experimental_only_coin_ids=tuple(
-                coin_id
-                for coin_id in experimental_ids
-                if coin_id not in current_set
+                coin_id for coin_id in experimental_ids if coin_id not in current_set
             ),
             current_only_coin_ids=tuple(
-                coin_id
-                for coin_id in current_ids
-                if coin_id not in experimental_set
+                coin_id for coin_id in current_ids if coin_id not in experimental_set
             ),
             experimental_priorities=experimental,
+            directional_continuities=tuple(directional_continuities),
         )
