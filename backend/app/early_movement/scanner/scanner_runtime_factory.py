@@ -83,6 +83,9 @@ from app.early_movement.extreme_movement.extreme_movement_discovery_schedule imp
 from app.early_movement.extreme_movement.postgresql_extreme_movement_discovery_trace_store import (
     PostgreSQLExtremeMovementDiscoveryTraceStore,
 )
+from app.early_movement.extreme_movement.postgresql_extreme_movement_directional_history_store import (
+    PostgreSQLExtremeMovementDirectionalHistoryStore,
+)
 from app.early_movement.extreme_movement.extreme_movement_experimental_tracking_coordinator import (
     ExtremeMovementExperimentalTrackingCoordinator,
 )
@@ -253,6 +256,26 @@ def build_early_movement_scanner_runtime(
                 )
             )
 
+        directional_history_store = None
+
+        if _env_enabled(
+            "EXTREME_MOVEMENT_DIRECTIONAL_HISTORY_ENABLED"
+        ):
+            if (
+                config.database_url is None
+                or not config.database_url.strip()
+            ):
+                raise ValueError(
+                    "Historico direcional experimental exige DATABASE_URL."
+                )
+
+            directional_history_store = (
+                PostgreSQLExtremeMovementDirectionalHistoryStore(
+                    database_url=config.database_url,
+                    scope_key=EXTREME_MOVEMENT_SCOPE_KEY,
+                )
+            )
+
         experimental_tracking_coordinator = None
 
         if _env_enabled(
@@ -295,6 +318,7 @@ def build_early_movement_scanner_runtime(
                     interval_seconds=900,
                 ),
                 trace_store=trace_store,
+                directional_history_store=directional_history_store,
             )
         )
 
