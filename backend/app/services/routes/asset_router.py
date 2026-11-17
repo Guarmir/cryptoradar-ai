@@ -323,15 +323,10 @@ def create_asset_router() -> APIRouter:
         )
 
         if not coin_id:
-            return {
-                "error": (
-                    "Moeda não encontrada"
-                ),
-                **build_empty_asset_response(
-                    coin,
-                    days,
-                ),
-            }
+            raise HTTPException(
+                status_code=404,
+                detail="Moeda não encontrada ou símbolo ambíguo.",
+            )
 
         market = get_market_data(
             coin_id
