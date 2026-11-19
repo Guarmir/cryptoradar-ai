@@ -7,6 +7,8 @@ from app.services.asset_analysis_service import (
     get_ai_confidence,
     get_ai_signal,
 )
+from app.services import market_data_service
+
 from app.services.market_data_service import (
     get_chart_data,
     get_market_data,
@@ -27,6 +29,45 @@ def create_asset_router() -> APIRouter:
     router = APIRouter(
         tags=["assets"],
     )
+
+    @router.get("/asset-options/{symbol}")
+    def get_asset_options(symbol: str):
+        # Apenas candidatos exatos para evitar identificar o ativo errado.
+        query = symbol.strip().lower()
+        if not query:
+            raise HTTPException(
+                status_code=400,
+                detail="Informe uma moeda válida.",
+            )
+
+        coins = market_data_service.get_coin_list()
+        matches = [
+            {
+                "coin_id": coin["id"],
+                "symbol": coin["symbol"].upper(),
+                "name": coin["name"],
+            }
+            for coin in coins
+            if isinstance(coin, dict)
+            and isinstance(coin.get("id"), str)
+            and isinstance(coin.get("symbol"), str)
+            and isinstance(coin.get("name"), str)
+            and (
+                coin["symbol"].lower() == query
+                or coin["id"].lower() == query
+                or coin["name"].lower() == query
+            )
+        ]
+        matches.sort(
+            key=lambda item: (
+                item["name"].casefold(),
+                item["coin_id"],
+            )
+        )
+        return {
+            "query": symbol.strip(),
+            "candidates": matches,
+        }
 
     @router.get("/analysis/{symbol}")
     def get_analysis(symbol: str):
