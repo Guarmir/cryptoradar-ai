@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 
 import requests
@@ -77,6 +78,22 @@ coin_list_cache = {
 
 market_cache = {}
 
+# Protege carregamentos simultaneos do mesmo ativo.
+# O lock principal protege somente o cadastro de locks.
+_market_locks_guard = threading.Lock()
+_market_locks: dict[str, threading.Lock] = {}
+_coin_list_lock = threading.Lock()
+
+
+def _get_market_lock(coin_id: str) -> threading.Lock:
+    with _market_locks_guard:
+        lock = _market_locks.get(coin_id)
+        if lock is None:
+            lock = threading.Lock()
+            _market_locks[coin_id] = lock
+        return lock
+
+
 chart_data_cache = ChartDataCache()
 
 chart_cache = chart_data_cache.storage
@@ -136,67 +153,55 @@ def get_coin_list():
 
     if (
         cached
-        and (
-            time.time()
-            - coin_list_cache["timestamp"]
-            <= COIN_LIST_TTL
-        )
+        and time.time() - coin_list_cache["timestamp"] <= COIN_LIST_TTL
     ):
         return cached
 
-    url = f"{COINGECKO_API}/coins/list"
-
-    try:
-        response = coingecko_request_coordinator.execute(
-            lambda: requests.get(
-              url,
-              timeout=20,
-            )
-        )
-
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Erro ao buscar lista "
-                    "de moedas."
-                ),
-            )
-
-        data = response.json()
-
-        coin_list_cache["data"] = data
-        coin_list_cache["timestamp"] = (
-            time.time()
-        )
-
-        return data
-
-    except HTTPException:
-        raise
-
-    except CoinGeckoRequestBlocked as error:
-        logger.warning(
-            "CoinGecko coin list blocked: status_code=429 reason=%s",
-            error,
-        )
-
-        if cached is not None:
+    # Apenas uma thread renova a lista por vez.
+    with _coin_list_lock:
+        cached = coin_list_cache["data"]
+        if (
+            cached
+            and time.time() - coin_list_cache["timestamp"] <= COIN_LIST_TTL
+        ):
             return cached
 
-        raise HTTPException(
-            status_code=503,
-            detail="Lista de moedas temporariamente indisponível.",
-        ) from error
+        url = f"{COINGECKO_API}/coins/list"
 
-    except Exception as error:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Erro ao buscar lista "
-                "de moedas."
-            ),
-        ) from error
+        try:
+            response = coingecko_request_coordinator.execute(
+                lambda: requests.get(url, timeout=20)
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Erro ao buscar lista de moedas.",
+                )
+
+            data = response.json()
+            coin_list_cache["data"] = data
+            coin_list_cache["timestamp"] = time.time()
+            return data
+
+        except HTTPException:
+            raise
+        except CoinGeckoRequestBlocked as error:
+            logger.warning(
+                "CoinGecko coin list blocked: status_code=429 reason=%s",
+                error,
+            )
+            if cached is not None:
+                return cached
+            raise HTTPException(
+                status_code=503,
+                detail="Lista de moedas temporariamente indisponível.",
+            ) from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Erro ao buscar lista de moedas.",
+            ) from error
 
 
 def resolve_coin_id(
@@ -373,79 +378,66 @@ def get_market_data_batch(
 def get_market_data(
     coin_id: str,
 ):
-    stale_cached = market_cache.get(
-        coin_id,
-    )
-
-    stale_market = (
-        stale_cached.get("data")
-        if stale_cached
-        else None
-    )
-    cached = get_cached(
-        market_cache,
-        coin_id,
-        MARKET_TTL,
-    )
-
+    cached = get_cached(market_cache, coin_id, MARKET_TTL)
     if cached:
         return cached
 
-    url = (
-        f"{COINGECKO_API}/coins/markets"
-    )
+    # Duas requisicoes do mesmo ativo compartilham o resultado:
+    # a segunda espera e relê o cache antes de acessar a CoinGecko.
+    with _get_market_lock(coin_id):
+        cached = get_cached(market_cache, coin_id, MARKET_TTL)
+        if cached:
+            return cached
 
-    params = {
-        "vs_currency": "usd",
-        "ids": coin_id,
-        "price_change_percentage": "24h",
-    }
-
-    try:
-        response = coingecko_request_coordinator.execute(
-            lambda: requests.get(
-               url,
-               params=params,
-               timeout=20,
-            )
+        stale_cached = market_cache.get(coin_id)
+        stale_market = (
+            stale_cached.get("data") if stale_cached else None
         )
 
-        if response.status_code != 200:
-            logger.warning(
-                "CoinGecko market request failed: "
-                "coin_id=%s status_code=%s",
-                coin_id,
-                response.status_code,
+        url = f"{COINGECKO_API}/coins/markets"
+        params = {
+            "vs_currency": "usd",
+            "ids": coin_id,
+            "price_change_percentage": "24h",
+        }
+
+        try:
+            response = coingecko_request_coordinator.execute(
+                lambda: requests.get(
+                    url,
+                    params=params,
+                    timeout=20,
+                )
             )
 
+            if response.status_code != 200:
+                logger.warning(
+                    "CoinGecko market request failed: "
+                    "coin_id=%s status_code=%s",
+                    coin_id,
+                    response.status_code,
+                )
+                return stale_market
+
+            data = response.json()
+            if not data:
+                return None
+
+            market = data[0]
+            set_cached(market_cache, coin_id, market)
+            return market
+
+        except CoinGeckoRequestBlocked as error:
+            logger.warning(
+                "CoinGecko market request blocked: "
+                "coin_id=%s status_code=429 reason=%s",
+                coin_id,
+                error,
+            )
+            return stale_market
+        except Exception:
             return stale_market
 
-        data = response.json()
-
-        if not data:
-            return None
-
-        market = data[0]
-
-        set_cached(
-            market_cache,
-            coin_id,
-            market,
-        )
-
-        return market
-
-    except CoinGeckoRequestBlocked as error:
-        logger.warning(
-            "CoinGecko market request blocked: "
-            "coin_id=%s status_code=429 reason=%s",
-            coin_id,
-            error,
-        )
-        return stale_market
-
-    except Exception:
-        return stale_market
 
 def get_cached_chart_data(
     coin_id: str,
