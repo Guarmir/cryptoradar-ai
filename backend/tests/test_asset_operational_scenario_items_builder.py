@@ -77,7 +77,7 @@ def test_maps_supporting_factors():
     )
 
     assert (
-        "contexto externo de mercado favorável"
+        "condições gerais do mercado favoráveis"
         in support.content
     )
 
@@ -87,7 +87,7 @@ def test_maps_supporting_factors():
     )
 
     assert (
-        "faixa operacional com qualidade forte"
+        "faixa de preço com confirmação forte"
         in support.content
     )
 
@@ -124,17 +124,17 @@ def test_maps_warning_factors():
     )
 
     assert (
-        "contexto externo de mercado desfavorável"
+        "condições gerais do mercado desfavoráveis"
         in warning.content
     )
 
     assert (
-        "Risk Score observado em nível alto"
+        "risco estimado em nível alto"
         in warning.content
     )
 
     assert (
-        "faixa operacional observada invalidada"
+        "faixa de preço observada não se mantém válida"
         in warning.content
     )
 
@@ -171,7 +171,7 @@ def test_conflicted_scenario_is_explained():
     )
 
     assert (
-        "cenário conflitante"
+        "cenário com sinais divergentes"
         in scenario.content
     )
 

@@ -122,7 +122,7 @@ def test_overview_answer_includes_operational_scenario():
     )
 
     assert (
-        "cenário operacional consolidado"
+        "análise de"
         in answer.lower()
     )
 
@@ -132,7 +132,7 @@ def test_overview_answer_includes_operational_scenario():
     )
 
     assert (
-        "contexto externo de mercado favorável"
+        "condições gerais do mercado favoráveis"
         in answer.lower()
     )
 

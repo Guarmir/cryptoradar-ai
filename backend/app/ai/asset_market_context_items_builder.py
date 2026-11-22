@@ -29,7 +29,7 @@ def build_asset_market_context_items(
     return (
         AssistantContextItem(
             key="asset_market_context",
-            title="Contexto externo do mercado",
+            title="Cenário geral do mercado",
             content=_build_context_text(
                 name=name,
                 assessment=assessment,
@@ -66,12 +66,12 @@ def build_asset_market_context_unavailable_item(
 ) -> AssistantContextItem:
     return AssistantContextItem(
         key="asset_market_context",
-        title="Contexto externo do mercado",
+        title="Cenário geral do mercado",
         content=(
-            "O contexto BTC/mercado geral está "
-            f"indisponível no momento para {name}. "
-            "A análise permanece baseada nos dados "
-            "próprios do ativo."
+            "As informações sobre o BTC e o mercado geral "
+            f"estão temporariamente indisponíveis para {name}. "
+            "A análise utiliza apenas os dados disponíveis "
+            "do próprio ativo."
         ),
     )
 
@@ -93,13 +93,12 @@ def _build_context_text(
     )
 
     return (
-        f"O contexto externo observado para {name} "
-        f"está {label}. A leitura combina o "
-        "comportamento do BTC em 24h, a variação "
-        "da capitalização total e a amplitude da "
-        "amostra de mercado. Essa leitura é "
-        "contextual e não representa recomendação "
-        "de compra ou venda."
+        f"As condições gerais do mercado para {name} "
+        f"apresentam um cenário {label}. Essa avaliação "
+        "considera a variação do BTC em 24h, a mudança "
+        "na capitalização total e a proporção de ativos "
+        "em alta e em queda. É uma análise de contexto, "
+        "não uma recomendação de compra ou venda."
     )
 
 
@@ -113,8 +112,8 @@ def _build_btc_text(
 
     if btc_change is None:
         change_text = (
-            "A variação do BTC em 24h está "
-            "indisponível na amostra observada."
+            "A variação do BTC em 24h não está "
+            "disponível no momento."
         )
     else:
         change_text = (
@@ -124,11 +123,12 @@ def _build_btc_text(
 
     return (
         f"{change_text} "
-        "A dominância atual do BTC é "
+        "A participação atual do BTC no valor total "
+        "do mercado é de "
         f"{assessment.btc_dominance_percent:.2f}%. "
-        "A dominância é usada como fotografia "
-        "atual; sem série histórica, não é "
-        "interpretada como subida ou queda."
+        "Esse valor mostra a situação atual, mas, "
+        "sem dados históricos comparáveis, não indica "
+        "se a participação está aumentando ou diminuindo."
     )
 
 
@@ -148,16 +148,15 @@ def _build_breadth_text(
     )
 
     return (
-        "A capitalização total varia "
+        "A capitalização total do mercado variou "
         f"{assessment.market_cap_change_24h_percent:+.2f}% "
-        "em 24h. Na amostra observada, "
-        f"{assessment.advancing_asset_count} ativos "
-        "estão em alta, "
+        "nas últimas 24h. Entre os ativos avaliados, "
+        f"{assessment.advancing_asset_count} estão em alta, "
         f"{assessment.declining_asset_count} em queda "
         "e "
         f"{assessment.unchanged_asset_count} sem "
-        "direção positiva ou negativa registrada. "
-        f"A amplitude está {label}."
+        "variação positiva ou negativa registrada. "
+        f"A participação dos ativos em alta e queda está {label}."
     )
 
 
@@ -172,9 +171,9 @@ def _build_relative_strength_text(
 
     if relative_change is None:
         return (
-            f"A força relativa de {name} frente ao BTC "
-            "não pode ser calculada porque a variação "
-            "do BTC em 24h está indisponível."
+            f"Não foi possível comparar o desempenho de {name} "
+            "com o BTC porque a variação do BTC em 24h "
+            "está indisponível."
         )
 
     labels = {
@@ -189,8 +188,8 @@ def _build_relative_strength_text(
     )
 
     return (
-        f"{name} está {relative_change:+.2f} ponto(s) "
-        "percentual(is) em relação ao BTC na janela "
-        f"de 24h, com desempenho relativo {label} "
-        "pelas regras V1 do backend."
+        f"Nas últimas 24h, {name} apresentou diferença "
+        f"de {relative_change:+.2f} ponto(s) percentual(is) "
+        "em relação ao BTC, com desempenho relativo "
+        f"{label}."
     )

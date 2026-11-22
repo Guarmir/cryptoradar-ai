@@ -142,7 +142,7 @@ def test_overview_answer_exposes_market_context():
     )
 
     assert (
-        "contexto externo observado"
+        "condições gerais do mercado"
         in answer.lower()
     )
 
@@ -169,7 +169,7 @@ def test_signal_answer_uses_market_context():
     assert "sinal atual" in answer.lower()
 
     assert (
-        "contexto externo observado"
+        "condições gerais do mercado"
         in answer.lower()
     )
 
@@ -192,7 +192,7 @@ def test_market_overview_failure_does_not_break_asset_analysis():
     assert "asset_market_context" in item_by_key
 
     assert (
-        "indisponível"
+        "indisponíveis"
         in item_by_key[
             "asset_market_context"
         ].content

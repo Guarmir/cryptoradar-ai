@@ -142,7 +142,7 @@ def test_asset_overview_builds_operational_scenario():
     ].content
 
     assert (
-        "contexto externo de mercado favorável"
+        "condições gerais do mercado favoráveis"
         in support
     )
 

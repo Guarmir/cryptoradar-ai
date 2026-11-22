@@ -10,7 +10,7 @@ _STATE_LABELS = {
     "bullish": "viés de alta",
     "bearish": "viés de baixa",
     "neutral": "cenário neutro",
-    "conflicted": "cenário conflitante",
+    "conflicted": "cenário com sinais divergentes",
 }
 
 _STRENGTH_LABELS = {
@@ -21,55 +21,55 @@ _STRENGTH_LABELS = {
 
 _FACTOR_LABELS = {
     "score_supports_upside": (
-        "score favorece o lado positivo"
+        "pontuação favorece a alta"
     ),
     "score_supports_downside": (
-        "score favorece o lado negativo"
+        "pontuação favorece a baixa"
     ),
     "price_change_supports_upside": (
-        "variação de 24h favorece o lado positivo"
+        "variação de 24h favorece a alta"
     ),
     "price_change_supports_downside": (
-        "variação de 24h favorece o lado negativo"
+        "variação de 24h favorece a baixa"
     ),
     "market_context_favorable": (
-        "contexto externo de mercado favorável"
+        "condições gerais do mercado favoráveis"
     ),
     "outperforming_btc": (
         "desempenho superior ao BTC"
     ),
     "range_quality_strong": (
-        "faixa operacional com qualidade forte"
+        "faixa de preço com confirmação forte"
     ),
     "range_invalidation_low": (
-        "baixo risco estrutural de invalidação da faixa"
+        "baixo risco de perda da faixa de preço observada"
     ),
     "observed_risk_low": (
-        "Risk Score observado em nível baixo"
+        "risco estimado em nível baixo"
     ),
 }
 
 _WARNING_LABELS = {
     "market_context_unfavorable": (
-        "contexto externo de mercado desfavorável"
+        "condições gerais do mercado desfavoráveis"
     ),
     "underperforming_btc": (
         "desempenho inferior ao BTC"
     ),
     "range_quality_weak": (
-        "faixa operacional com confirmação fraca"
+        "faixa de preço com confirmação fraca"
     ),
     "range_invalidation_high": (
-        "risco estrutural elevado de invalidação da faixa"
+        "risco elevado de perda da faixa de preço observada"
     ),
     "range_invalidated": (
-        "faixa operacional observada invalidada"
+        "faixa de preço observada não se mantém válida"
     ),
     "observed_risk_high": (
-        "Risk Score observado em nível alto"
+        "risco estimado em nível alto"
     ),
     "observed_risk_elevated": (
-        "Risk Score observado em nível elevado"
+        "risco estimado em nível elevado"
     ),
 }
 
@@ -96,14 +96,13 @@ def build_asset_operational_scenario_items(
         key="asset_operational_scenario",
         title="Cenário operacional",
         content=(
-            f"O cenário operacional consolidado "
-            f"de {name} apresenta {state_label}, "
+            f"A análise de {name} indica {state_label}, "
             f"com confirmação {strength_label}. "
-            f"A pontuação direcional V1 é "
+            "A pontuação de direção é "
             f"{assessment.directional_score:+d}. "
-            "Essa leitura é observacional e não "
-            "representa recomendação de compra "
-            "ou venda."
+            "Esse resultado descreve as condições "
+            "observadas e não representa recomendação "
+            "de compra ou venda."
         ),
     )
 
