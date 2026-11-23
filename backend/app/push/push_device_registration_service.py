@@ -1,8 +1,8 @@
 """Cadastro de dispositivos push com protecao de instalacoes vinculadas.
 
 O registro legado continua disponivel para instalacoes SEM proprietario.
-Instalacoes vinculadas so poderao atualizar o token por um futuro fluxo
-AUTENTICADO. Nao utilizar este servico para reivindicar instalacoes.
+Instalacoes vinculadas so podem renovar o token pelo fluxo autenticado.
+Nenhum dos fluxos abaixo cria ou reivindica vinculos de propriedade.
 """
 
 from typing import Optional, Protocol
@@ -16,7 +16,7 @@ class PushInstallationOwnerReader(Protocol):
 
 
 class ProtectedInstallationRegistrationError(PermissionError):
-    """O registro publico nao pode modificar instalacao vinculada."""
+    """O cadastro solicitado nao tem autorizacao sobre a instalacao."""
 
 
 class PushDeviceRegistrationService:
@@ -57,3 +57,58 @@ class PushDeviceRegistrationService:
 
         self._store.save_device(device)
         return device
+
+    def register_authenticated(
+        self,
+        *,
+        installation_id: str,
+        authenticated_uid: str,
+        fcm_token: str,
+        firebase_installation_id: Optional[str] = None,
+        platform: str = "android",
+    ) -> PushDevice:
+        """Renova token de instalacao JA vinculada ao UID autenticado.
+
+        A identidade deve vir de token Firebase verificado pelo servidor,
+        nunca de um campo UID enviado sem autenticacao pelo cliente.
+        """
+        device = PushDevice(
+            installation_id=installation_id,
+            fcm_token=fcm_token,
+            firebase_installation_id=firebase_installation_id,
+            platform=platform,
+            enabled=True,
+        )
+        uid = authenticated_uid.strip()
+        if not uid:
+            raise ProtectedInstallationRegistrationError(
+                "Identidade autenticada obrigatoria."
+            )
+        if self._owner_store is None:
+            raise ProtectedInstallationRegistrationError(
+                "Autorizacao da instalacao indisponivel."
+            )
+
+        # Nao reivindicar dispositivos antigos, nem autorizar UID diferente.
+        owner_uid = self._owner_store.load_owner_uid(device.installation_id)
+        if owner_uid != uid:
+            raise ProtectedInstallationRegistrationError(
+                "Identidade nao autorizada para esta instalacao."
+            )
+
+        existing = self._store.load_device(device.installation_id)
+        if existing is None:
+            raise ProtectedInstallationRegistrationError(
+                "Instalacao vinculada nao encontrada."
+            )
+
+        # Preservar estado operacional anterior na renovacao de token.
+        updated_device = PushDevice(
+            installation_id=device.installation_id,
+            fcm_token=device.fcm_token,
+            firebase_installation_id=device.firebase_installation_id,
+            platform=device.platform,
+            enabled=existing.enabled,
+        )
+        self._store.save_device(updated_device)
+        return updated_device
