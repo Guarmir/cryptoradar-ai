@@ -41,6 +41,9 @@ from app.early_movement.scanner.scanner_scheduler import (
 from app.early_movement.scanner.scanner_signal_history_service import (
     EarlyMovementScannerSignalHistoryService,
 )
+from app.push.postgresql_push_notification_preferences_store import (
+    PostgreSQLPushNotificationPreferencesStore,
+)
 from app.push.firebase_admin_push_sender import (
     FirebaseAdminPushSender,
 )
@@ -168,6 +171,12 @@ def build_early_movement_scanner_runtime(
         delivery_service = PushDeliveryService(
             device_store=device_store,
             push_sender=push_sender,
+            notification_preferences_store=(
+                PostgreSQLPushNotificationPreferencesStore(
+                    database_url=database_url,
+                    scope_key=push_scope_key,
+                )
+            ),
         )
 
         push_service = EarlyMovementScannerPushService(
