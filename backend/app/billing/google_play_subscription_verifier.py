@@ -1,15 +1,13 @@
-"""Consulta a Google Play sobre uma assinatura, sem conceder permissões.
+"""Consulta a Google Play sobre uma assinatura, sem conceder permissoes.
 
-Este componente NÃO vincula compras a usuários, não reconhece compras
-(acknowledge) e não altera planos. O acesso deve ser decidido por uma camada
-autenticada com vinculação persistente e prevenção de reutilização de tokens.
+Este componente nao vincula compras a usuarios, nao reconhece compras
+(acknowledge) e nao altera planos. O acesso deve ser decidido por uma camada
+autenticada com vinculacao persistente e prevencao de reutilizacao de tokens.
 """
-
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
-
 
 GOOGLE_PLAY_SCOPE = "https://www.googleapis.com/auth/androidpublisher"
 _ALLOWED_ENTITLEMENT_STATES = frozenset({
@@ -31,6 +29,7 @@ class VerifiedGooglePlaySubscription:
     acknowledgement_state: str
     entitled_now: bool
     linked_purchase_token: str | None
+    obfuscated_account_id: str | None = None
 
 
 class GooglePlaySubscriptionVerifier:
@@ -58,7 +57,6 @@ class GooglePlaySubscriptionVerifier:
     def verify(self, purchase_token: str) -> VerifiedGooglePlaySubscription:
         if not isinstance(purchase_token, str) or not purchase_token.strip():
             raise ValueError("purchase_token obrigatorio")
-
         try:
             credentials = self._credentials()
             if not credentials.valid:
@@ -66,7 +64,6 @@ class GooglePlaySubscriptionVerifier:
                 credentials.refresh(Request())
             if not credentials.valid or not credentials.token:
                 raise GooglePlaySubscriptionVerificationError("Credencial Google invalida")
-
             import requests
             get = self._http_get or requests.get
             url = (
@@ -81,7 +78,6 @@ class GooglePlaySubscriptionVerifier:
                 timeout=15,
             )
             if response.status_code != 200:
-                # Nao incluir resposta HTTP ou token de compra em logs/erros.
                 raise GooglePlaySubscriptionVerificationError(
                     f"Consulta Google Play falhou (HTTP {response.status_code})"
                 )
@@ -92,7 +88,6 @@ class GooglePlaySubscriptionVerifier:
             raise GooglePlaySubscriptionVerificationError(
                 "Nao foi possivel consultar a assinatura na Google Play"
             ) from exc
-
         return self._parse(payload)
 
     def _credentials(self) -> Any:
@@ -108,16 +103,13 @@ class GooglePlaySubscriptionVerifier:
         state = payload.get("subscriptionState")
         if not isinstance(state, str):
             raise GooglePlaySubscriptionVerificationError("Estado de assinatura ausente")
-
         line_items = payload.get("lineItems")
         if not isinstance(line_items, list):
             raise GooglePlaySubscriptionVerificationError("Itens da assinatura ausentes")
-
         matching = [item for item in line_items
                     if isinstance(item, Mapping) and item.get("productId") == self._product_id]
         if not matching:
             raise GooglePlaySubscriptionVerificationError("Produto de assinatura nao corresponde")
-
         try:
             expiries = [self._parse_timestamp(item["expiryTime"]) for item in matching]
         except (KeyError, ValueError, TypeError) as exc:
@@ -126,9 +118,11 @@ class GooglePlaySubscriptionVerifier:
         now = self._now_provider()
         if now.tzinfo is None:
             raise ValueError("now_provider deve retornar datetime com fuso")
-
         acknowledgement = payload.get("acknowledgementState", "")
         linked_token = payload.get("linkedPurchaseToken")
+        external_ids = payload.get("externalAccountIdentifiers")
+        account_id = (external_ids.get("obfuscatedExternalAccountId")
+                      if isinstance(external_ids, Mapping) else None)
         return VerifiedGooglePlaySubscription(
             product_id=self._product_id,
             state=state,
@@ -136,6 +130,7 @@ class GooglePlaySubscriptionVerifier:
             acknowledgement_state=acknowledgement if isinstance(acknowledgement, str) else "",
             entitled_now=state in _ALLOWED_ENTITLEMENT_STATES and expires_at > now,
             linked_purchase_token=linked_token if isinstance(linked_token, str) else None,
+            obfuscated_account_id=account_id if isinstance(account_id, str) else None,
         )
 
     @staticmethod
