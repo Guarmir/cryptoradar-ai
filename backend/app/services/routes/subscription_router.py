@@ -2,6 +2,8 @@ from fastapi import APIRouter, Header, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from app.access.access_api import AccessEntitlementsResponse
+from app.billing.subscription_installation_access import get_installation_access
 from app.billing.subscription_installation_grant import (
     GrantRequest, GrantResponse, register_installation_grant,
 )
@@ -61,6 +63,13 @@ def create_subscription_router() -> APIRouter:
                        authorization: str | None = Header(default=None)):
         response.headers["Cache-Control"] = "no-store"
         return register_installation_grant(request, authorization)
+
+    @private.get("/billing/google-play/installation-access/{installation_id}",
+                 response_model=AccessEntitlementsResponse)
+    def access_endpoint(installation_id: str, response: Response,
+                        authorization: str | None = Header(default=None)):
+        response.headers["Cache-Control"] = "no-store"
+        return get_installation_access(installation_id, authorization)
 
     router.include_router(private)
     return router
