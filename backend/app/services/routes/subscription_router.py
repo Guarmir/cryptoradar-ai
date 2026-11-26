@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, Response
+
+from app.billing.subscription_status_api import (
+    SubscriptionStatusResponse,
+    get_subscription_status,
+)
 
 from app.billing.subscription_api import (
     SubscriptionClaimRequest,
@@ -19,5 +24,16 @@ def create_subscription_router() -> APIRouter:
         authorization: str | None = Header(default=None),
     ) -> SubscriptionClaimResponse:
         return claim_subscription(request, authorization)
+
+    @router.get(
+        "/billing/google-play/status",
+        response_model=SubscriptionStatusResponse,
+    )
+    def status_endpoint(
+        response: Response,
+        authorization: str | None = Header(default=None),
+    ) -> SubscriptionStatusResponse:
+        response.headers["Cache-Control"] = "no-store"
+        return get_subscription_status(authorization)
 
     return router
