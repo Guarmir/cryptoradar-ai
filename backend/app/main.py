@@ -26,6 +26,8 @@ from app.services.routes.push_router import (
     create_push_router,
 )
 
+from app.push.authenticated_installation_api import create_installation_router
+
 from app.services.routes.subscription_router import (
     create_subscription_router,
 )
@@ -77,6 +79,9 @@ app.include_router(
 app.include_router(
     create_subscription_router()
 )
+
+
+app.include_router(create_installation_router())
 
 
 @app.get("/")
