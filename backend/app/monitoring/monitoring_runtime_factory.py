@@ -27,6 +27,7 @@ from app.monitoring.monitoring_service import (
 from app.monitoring.postgresql_monitoring_state_store import (
     PostgreSQLMonitoringStateStore,
 )
+from app.push.commercial_monitoring_delivery import monitoring_delivery_store
 from app.push.firebase_admin_push_sender import (
     FirebaseAdminPushSender,
 )
@@ -130,7 +131,11 @@ def build_monitoring_runtime(
 
         delivery_service = (
             PushDeliveryService(
-                device_store=device_store,
+                device_store=monitoring_delivery_store(
+                    device_store=device_store,
+                    database_url=push_database_url,
+                    scope_key=push_scope_key,
+                ),
                 push_sender=push_sender,
             )
         )
@@ -180,7 +185,6 @@ def build_monitoring_runtime(
             market_event_callback
         ),
     )
-
     scheduler = MonitoringScheduler(
         runner=runner,
         interval_seconds=(
