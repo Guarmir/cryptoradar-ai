@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -25,6 +24,10 @@ from app.services.routes.extreme_movement_router import (
 )
 from app.services.routes.push_router import (
     create_push_router,
+)
+
+from app.services.routes.subscription_router import (
+    create_subscription_router,
 )
 
 
@@ -68,6 +71,11 @@ app.include_router(
 
 app.include_router(
     create_extreme_movement_router()
+)
+
+
+app.include_router(
+    create_subscription_router()
 )
 
 
