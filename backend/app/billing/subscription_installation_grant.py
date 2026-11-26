@@ -37,6 +37,10 @@ class InstallationGrantStore:
         try:
             cursor = connection.cursor()
             try:
+                if os.getenv("GOOGLE_PLAY_REFRESH_ENABLED", "").strip().lower() == "true":
+                    from app.billing.subscription_lifecycle import retain_token, token_cipher
+                    retain_token(cursor, scope=self.subscription_scope, package=self.package,
+                                 uid=uid, token=purchase_token, cipher=token_cipher())
                 # Recheck persisted ownership and purchase atomically with the write.
                 cursor.execute('''INSERT INTO cryptoradar_subscription_installation_grants AS grants
                     (push_scope, installation_id, firebase_auth_uid, subscription_scope,
