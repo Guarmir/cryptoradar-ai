@@ -4,8 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.ai.radar_ai_router import (
     create_radar_ai_router,
 )
-from app.application_fastapi_lifecycle import (
-    application_lifespan,
+from app.billing.subscription_lifecycle_runtime import (
+    subscription_refresh_lifespan,
 )
 from app.services.routes.access_router import (
     create_access_router,
@@ -36,7 +36,7 @@ from app.services.routes.subscription_router import (
 app = FastAPI(
     title="CryptoRadar AI",
     version="2.1.0",
-    lifespan=application_lifespan,
+    lifespan=subscription_refresh_lifespan,
 )
 
 app.add_middleware(
