@@ -3,8 +3,8 @@ from typing import Optional
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from app.push.postgresql_push_device_store import (
-    PostgreSQLPushDeviceStore,
+from app.push.postgresql_legacy_registration_store import (
+    PostgreSQLLegacyRegistrationStore as PostgreSQLPushDeviceStore,
 )
 from app.push.postgresql_push_installation_owner_store import (
     PostgreSQLPushInstallationOwnerStore,
@@ -85,8 +85,8 @@ def register_push_device(
             firebase_installation_id=request.firebase_installation_id,
             platform=request.platform,
         )
-    except ProtectedInstallationRegistrationError as error:
-        raise HTTPException(status_code=403, detail=str(error)) from error
+    except ProtectedInstallationRegistrationError:
+        raise HTTPException(status_code=403, detail="Instalacao protegida.") from None
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -96,3 +96,4 @@ def register_push_device(
         platform=device.platform,
         enabled=device.enabled,
     )
+
