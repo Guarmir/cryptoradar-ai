@@ -11,6 +11,7 @@ from app.monitoring.postgresql_individual_monitoring_store import (
     PostgreSQLIndividualMonitoringStore,
 )
 from app.services.market_data_service import get_coin_list
+from app.monitoring.individual_monitoring_intent import MonitoringIntent
 
 
 class IndividualMonitoringService:
@@ -71,6 +72,25 @@ class IndividualMonitoringService:
     def remove_asset(self, *, authorization, installation_id, coin_id):
         uid = self._identity(authorization, installation_id)
         return {'removed': self.store.remove(uid=uid, coin_id=self._coin_id(coin_id))}
+
+
+    def get_intent(self, *, authorization, installation_id, coin_id):
+        uid = self._identity(authorization, installation_id)
+        intent = self.store.load_intent(uid=uid, coin_id=self._coin_id(coin_id))
+        if intent is None:
+            raise HTTPException(404, 'Ativo nao cadastrado.')
+        return asdict(intent)
+
+    def set_intent(self, *, authorization, installation_id, coin_id, intent, side):
+        uid = self._identity(authorization, installation_id)
+        coin_id = self._coin_id(coin_id)
+        try:
+            settings = MonitoringIntent(intent, side)
+        except ValueError:
+            raise HTTPException(422, 'Intencao ou direcao invalida.') from None
+        if not self.store.save_intent(uid=uid, coin_id=coin_id, intent=settings):
+            raise HTTPException(404, 'Ativo nao cadastrado.')
+        return asdict(settings)
 
 
 def create_individual_monitoring_service():

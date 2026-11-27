@@ -11,6 +11,8 @@ from app.monitoring.monitoring_target import MonitoringTarget
 from app.monitoring.monitoring_state import MonitoringState
 from app.monitoring.monitoring_observation_builder import build_monitoring_observation
 
+from app.monitoring.individual_monitoring_intent import MonitoringIntent, interpret_observation
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +21,8 @@ class ActiveAsset:
     uid: str
     coin_id: str
     symbol: str
+    intent: str = "opportunity"
+    side: str | None = None
 
 
 class ActiveWatchlistReader:
@@ -42,7 +46,7 @@ class ActiveWatchlistReader:
         try:
             with connection.cursor() as cursor:
                 cursor.execute('''WITH ranked AS (
-                    SELECT a.firebase_auth_uid, a.coin_id, a.symbol,
+                    SELECT a.firebase_auth_uid, a.coin_id, a.symbol, a.intent, a.position_side,
                         row_number() OVER (PARTITION BY a.firebase_auth_uid ORDER BY a.created_at, a.coin_id) AS rn
                     FROM cryptoradar_individual_monitoring_assets a WHERE a.scope_key = %s
                 ), entitled AS (
@@ -61,7 +65,7 @@ class ActiveWatchlistReader:
                       AND s.subscription_state IN ('SUBSCRIPTION_STATE_ACTIVE',
                           'SUBSCRIPTION_STATE_IN_GRACE_PERIOD', 'SUBSCRIPTION_STATE_CANCELED')
                       AND s.acknowledgement_state IN ('ACKNOWLEDGEMENT_STATE_PENDING', 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED')
-                ) SELECT r.firebase_auth_uid, r.coin_id, r.symbol FROM ranked r
+                ) SELECT r.firebase_auth_uid, r.coin_id, r.symbol, r.intent, r.position_side FROM ranked r
                   LEFT JOIN entitled e ON e.firebase_auth_uid = r.firebase_auth_uid
                   WHERE r.rn <= CASE WHEN e.firebase_auth_uid IS NULL THEN %s ELSE %s END
                   ORDER BY r.firebase_auth_uid, r.rn''', (
@@ -83,14 +87,20 @@ class IndividualMonitoringRuntime:
         self.batch_size = batch_size
         self._states = {}
         self._snapshot = MappingProxyType({})
+        self._interpretations = MappingProxyType({})
 
     @property
     def snapshot(self):
         return self._snapshot
 
+    @property
+    def interpretations(self):
+        return self._interpretations
+
     def run_once(self):
         # Never expose previous account authorization as current on a failed read.
         self._snapshot = MappingProxyType({})
+        self._interpretations = MappingProxyType({})
         assets = self.reader.load_active()
         ids = sorted({asset.coin_id for asset in assets})
         self._states = {key: state for key, state in self._states.items() if key in ids}
@@ -127,6 +137,10 @@ class IndividualMonitoringRuntime:
         # This snapshot is internal only; user-facing access must reauthorize.
         self._snapshot = MappingProxyType({(a.uid, a.coin_id): self._states[a.coin_id]
                                            for a in assets if a.coin_id in fresh})
+        self._interpretations = MappingProxyType({
+            (a.uid, a.coin_id): interpret_observation(self._states[a.coin_id],
+                                                       MonitoringIntent(a.intent, a.side))
+            for a in assets if a.coin_id in fresh})
         return len(self._snapshot)
 
 

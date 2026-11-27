@@ -6,6 +6,8 @@ All additions serialize by account across installations and processes.
 from dataclasses import dataclass
 import json
 
+from app.monitoring.individual_monitoring_intent import MonitoringIntent
+
 
 class IndividualMonitoringLimitReached(ValueError):
     pass
@@ -109,6 +111,43 @@ class PostgreSQLIndividualMonitoringStore:
                 removed = cursor.rowcount == 1
             connection.commit()
             return removed
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def load_intent(self, *, uid, coin_id):
+        account = self._account(uid)
+        coin_id = _normalize(coin_id, 200).lower()
+        connection = self._connect()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""SELECT intent, position_side
+                    FROM cryptoradar_individual_monitoring_assets
+                    WHERE scope_key = %s AND firebase_auth_uid = %s AND coin_id = %s""",
+                    (*account, coin_id))
+                row = cursor.fetchone()
+                return None if row is None else MonitoringIntent(*row)
+        finally:
+            connection.close()
+
+    def save_intent(self, *, uid, coin_id, intent):
+        if not isinstance(intent, MonitoringIntent):
+            raise TypeError('Intencao invalida.')
+        account = self._account(uid)
+        coin_id = _normalize(coin_id, 200).lower()
+        connection = self._connect()
+        try:
+            with connection.cursor() as cursor:
+                self._lock(cursor, account)
+                cursor.execute("""UPDATE cryptoradar_individual_monitoring_assets
+                    SET intent = %s, position_side = %s
+                    WHERE scope_key = %s AND firebase_auth_uid = %s AND coin_id = %s""",
+                    (intent.intent, intent.side, *account, coin_id))
+                updated = cursor.rowcount == 1
+            connection.commit()
+            return updated
         except Exception:
             connection.rollback()
             raise
