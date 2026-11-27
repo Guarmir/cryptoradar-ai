@@ -38,6 +38,22 @@ class AuthenticatedInstallationEnrollment:
                                         firebase_installation_id=fid)
         return AuthenticatedInstallation(installation_id, uid)
 
+    def rotate(self, *, authorization, installation_id, fcm_token, firebase_installation_id):
+        uid = self._required(self._identity.verify_bearer(authorization), 128, 'uid')
+        installation_id = self._required(installation_id, 200, 'installation_id')
+        token = self._required(fcm_token, 4096, 'fcm_token')
+        fid = self._required(firebase_installation_id, 200, 'firebase_installation_id')
+        result = self._store.rotate_owned_device(installation_id=installation_id,
+            firebase_auth_uid=uid, fcm_token=token, firebase_installation_id=fid)
+        if result != installation_id:
+            raise ValueError('Vinculacao indisponivel.')
+        return AuthenticatedInstallation(result, uid)
+
+    def detach(self, *, authorization, installation_id):
+        uid = self._required(self._identity.verify_bearer(authorization), 128, 'uid')
+        installation_id = self._required(installation_id, 200, 'installation_id')
+        self._store.detach_owned_device(installation_id=installation_id, firebase_auth_uid=uid)
+
     @staticmethod
     def _required(value, maximum, name):
         if not isinstance(value, str) or not value.strip() or len(value) > maximum:

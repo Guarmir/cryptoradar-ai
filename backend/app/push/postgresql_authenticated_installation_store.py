@@ -89,3 +89,77 @@ class PostgreSQLAuthenticatedInstallationStore:
                 cursor.close()
         finally:
             connection.close()
+
+    def rotate_owned_device(self, *, installation_id, firebase_auth_uid,
+                            fcm_token, firebase_installation_id):
+        """Only after fresh FCM proof; preserve the original owner and grant."""
+        from hashlib import sha256
+        lock_key = sha256((self._scope_key + "\0" + fcm_token).encode()).hexdigest()
+        connection = self._connect()
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))',
+                               (lock_key,))
+                cursor.execute('''SELECT o.firebase_auth_uid, d.firebase_installation_id, d.enabled
+                    FROM cryptoradar_push_devices d
+                    JOIN cryptoradar_push_installation_owners o
+                      ON o.scope_key=d.scope_key AND o.installation_id=d.installation_id
+                    WHERE d.scope_key=%s AND d.installation_id=%s
+                    FOR UPDATE OF d, o''', (self._scope_key, installation_id))
+                row = cursor.fetchone()
+                if (row is None or row[0] != firebase_auth_uid or row[2] is not True
+                        or not firebase_installation_id or row[1] != firebase_installation_id):
+                    raise ValueError('Vinculacao indisponivel.')
+                cursor.execute('''SELECT d.installation_id FROM cryptoradar_push_devices d
+                    JOIN cryptoradar_push_installation_owners o
+                      ON o.scope_key=d.scope_key AND o.installation_id=d.installation_id
+                    WHERE d.scope_key=%s AND d.fcm_token=%s AND d.installation_id<>%s''',
+                    (self._scope_key, fcm_token, installation_id))
+                if cursor.fetchone() is not None:
+                    raise ValueError('Destino ja vinculado.')
+                cursor.execute('''UPDATE cryptoradar_push_devices
+                    SET fcm_token=%s, updated_at=NOW()
+                    WHERE scope_key=%s AND installation_id=%s RETURNING installation_id''',
+                    (fcm_token, self._scope_key, installation_id))
+                if cursor.fetchone() != (installation_id,):
+                    raise ValueError('Vinculacao indisponivel.')
+                connection.commit()
+                return installation_id
+            except Exception:
+                connection.rollback()
+                raise
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+    def detach_owned_device(self, *, installation_id, firebase_auth_uid):
+        """Remove only this installation; ownership and grants cascade, not the account."""
+        connection = self._connect()
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute('''SELECT d.installation_id, o.firebase_auth_uid
+                    FROM cryptoradar_push_devices d
+                    LEFT JOIN cryptoradar_push_installation_owners o
+                      ON o.scope_key=d.scope_key AND o.installation_id=d.installation_id
+                    WHERE d.scope_key=%s AND d.installation_id=%s FOR UPDATE OF d''',
+                    (self._scope_key, installation_id))
+                row = cursor.fetchone()
+                if row is not None:
+                    if row[1] != firebase_auth_uid:
+                        raise ValueError('Vinculacao indisponivel.')
+                    cursor.execute('''DELETE FROM cryptoradar_push_devices
+                        WHERE scope_key=%s AND installation_id=%s RETURNING installation_id''',
+                        (self._scope_key, installation_id))
+                    if cursor.fetchone() != (installation_id,):
+                        raise ValueError('Vinculacao indisponivel.')
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            finally:
+                cursor.close()
+        finally:
+            connection.close()

@@ -28,6 +28,18 @@ class ConfirmRequest(DestinationRequest):
     proof: str = Field(min_length=1, max_length=128)
 
 
+class RotationRequest(ConfirmRequest):
+    installation_id: str = Field(min_length=1, max_length=200)
+
+
+class DetachRequest(BaseModel):
+    installation_id: str = Field(min_length=1, max_length=200)
+
+
+class DetachResponse(BaseModel):
+    status: Literal['detached'] = 'detached'
+
+
 class ChallengeResponse(BaseModel):
     challenge_id: str
     expires_in_seconds: Literal[300] = 300
@@ -129,6 +141,19 @@ class InstallationEnrollmentFlow:
         return EnrollmentResponse(installation_id=result.installation_id)
 
 
+    def rotate(self, request, authorization):
+        args = self._check('confirm', request, authorization)
+        dest = self.challenge.verify(**args, challenge_id=request.challenge_id, proof=request.proof)
+        result = self.enrollment.rotate(authorization=authorization,
+            installation_id=request.installation_id, fcm_token=dest.fcm_token,
+            firebase_installation_id=dest.firebase_installation_id)
+        return EnrollmentResponse(installation_id=result.installation_id)
+
+    def detach(self, request, authorization):
+        self.enrollment.detach(authorization=authorization, installation_id=request.installation_id)
+        return DetachResponse()
+
+
 def create_flow():
     if os.getenv('CRYPTORADAR_AUTHENTICATED_ENROLLMENT_ENABLED', '').strip().lower() != 'true':
         raise HTTPException(status_code=503, detail='Vinculacao indisponivel.')
@@ -181,5 +206,13 @@ def create_installation_router(flow_factory=None):
     @router.post('/push/installations/confirm', response_model=EnrollmentResponse)
     def confirm(request: ConfirmRequest, authorization: str | None = Header(default=None)):
         return run('confirm', request, authorization)
+
+    @router.post('/push/installations/rotate', response_model=EnrollmentResponse)
+    def rotate(request: RotationRequest, authorization: str | None = Header(default=None)):
+        return run('rotate', request, authorization)
+
+    @router.post('/push/installations/detach', response_model=DetachResponse)
+    def detach(request: DetachRequest, authorization: str | None = Header(default=None)):
+        return run('detach', request, authorization)
 
     return router

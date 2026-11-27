@@ -21,6 +21,9 @@ REQUIRED_FLAGS = (
     'GOOGLE_PLAY_REFRESH_ENABLED',
     'GOOGLE_PLAY_MONITORING_ACCESS_ENABLED',
     'CRYPTORADAR_AUTHENTICATED_ENROLLMENT_ENABLED',
+    'CRYPTORADAR_INDIVIDUAL_MONITORING_ENABLED',
+    'CRYPTORADAR_INDIVIDUAL_MONITORING_RUNTIME_ENABLED',
+    'CRYPTORADAR_INDIVIDUAL_ALERTS_ENABLED',
 )
 
 
@@ -65,7 +68,7 @@ def create_grant_acknowledgement(*, identity, verifier, store, package,
             database_url, push_scope, subscription_scope, package):
         raise HTTPException(503, 'Contratacao indisponivel.')
     rights = access.config.pro
-    if (rights.monitored_asset_limit < 10 or not rights.automatic_market_alerts
+    if (rights.monitored_asset_limit != 10 or not rights.automatic_market_alerts
             or not rights.futures_enabled):
         raise HTTPException(503, 'Contratacao indisponivel.')
     return GrantAcknowledgement(identity=identity, verifier=verifier, store=store,
