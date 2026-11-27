@@ -18,7 +18,9 @@ class InstallationGrantReader:
         self.package = package_name
         self.factory = connection_factory
 
-    def has_access(self, *, installation_id, uid):
+    def has_access(self, *, installation_id, uid, purchase_token=None):
+        from hashlib import sha256
+        digest = sha256(purchase_token.encode("utf-8")).hexdigest() if purchase_token is not None else None
         if self.factory is None:
             import psycopg
             connection = psycopg.connect(self.url)
@@ -27,7 +29,7 @@ class InstallationGrantReader:
         try:
             cursor = connection.cursor()
             try:
-                cursor.execute('''SELECT EXISTS (
+                sql = '''SELECT EXISTS (
                     SELECT 1 FROM cryptoradar_subscription_installation_grants g
                     JOIN cryptoradar_push_installation_owners o
                       ON o.scope_key = g.push_scope
@@ -46,9 +48,12 @@ class InstallationGrantReader:
                       AND s.subscription_state IN ('SUBSCRIPTION_STATE_ACTIVE',
                           'SUBSCRIPTION_STATE_IN_GRACE_PERIOD', 'SUBSCRIPTION_STATE_CANCELED')
                       AND s.acknowledgement_state IN ('ACKNOWLEDGEMENT_STATE_PENDING',
-                          'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED'))''',
-                    (self.push_scope, installation_id, uid,
-                     self.subscription_scope, self.package))
+                          'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED')'''
+                params = (self.push_scope, installation_id, uid, self.subscription_scope, self.package)
+                if digest is not None:
+                    sql += ' AND g.purchase_token_hash = %s'
+                    params += (digest,)
+                cursor.execute(sql + ')', params)
                 row = cursor.fetchone()
                 return bool(row and row[0] is True)
             finally:

@@ -80,11 +80,12 @@ class InstallationGrantStore:
 
 
 class InstallationGrantService:
-    def __init__(self, *, authorizer, claim_service, entitlement_service, grant_store):
+    def __init__(self, *, authorizer, claim_service, entitlement_service, grant_store, acknowledgement=None):
         self.authorizer = authorizer
         self.claim_service = claim_service
         self.entitlement_service = entitlement_service
         self.grant_store = grant_store
+        self.acknowledgement = acknowledgement
 
     def register(self, request, authorization):
         installation = request.installation_id.strip()
@@ -99,6 +100,9 @@ class InstallationGrantService:
             raise HTTPException(status_code=409, detail='Assinatura indisponivel para autorizacao.')
         if self.grant_store.register(uid=uid, installation_id=installation, purchase_token=token) is not True:
             raise HTTPException(status_code=409, detail='Autorizacao indisponivel.')
+        if self.acknowledgement is not None:
+            self.acknowledgement(authorization=authorization, installation_id=installation,
+                                 uid=uid, purchase_token=token)
         return GrantResponse()
 
 
@@ -125,6 +129,12 @@ def create_grant_service():
     identity = FirebaseIdentityVerifier()
     verifier = GooglePlaySubscriptionVerifier(package_name=package, product_id='cryptoradar_pro_monthly')
     store = PostgreSQLGooglePlaySubscriptionStore(database_url=access.database_url, scope_key=scope)
+    acknowledgement = None
+    if os.getenv("GOOGLE_PLAY_COMMERCIAL_FULFILLMENT_ENABLED", "").strip().lower() == "true":
+        from app.billing.subscription_grant_acknowledgement import create_grant_acknowledgement
+        acknowledgement = create_grant_acknowledgement(identity=identity, verifier=verifier,
+            store=store, package=package, database_url=access.database_url,
+            push_scope=push.scope_key, subscription_scope=scope)
     return InstallationGrantService(
         authorizer=PushInstallationAuthorizer(identity_verifier=identity,
             owner_store=PostgreSQLPushInstallationOwnerStore(database_url=push.database_url, scope_key=push.scope_key)),
@@ -133,7 +143,7 @@ def create_grant_service():
         entitlement_service=SubscriptionEntitlementService(identity_verifier=identity, subscription_verifier=verifier,
             subscription_store=store),
         grant_store=InstallationGrantStore(database_url=access.database_url, push_scope=push.scope_key,
-            subscription_scope=scope, package_name=package))
+            subscription_scope=scope, package_name=package), acknowledgement=acknowledgement)
 
 
 def register_installation_grant(request, authorization, service=None):
