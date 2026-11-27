@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictBool
 
 from app.monitoring.individual_monitoring_api import create_individual_monitoring_service
 
@@ -15,6 +15,12 @@ class MonitoringIntentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     intent: Literal["opportunity", "position"]
     side: Literal["long", "short"] | None = None
+
+
+class MonitoringAlertSettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    interval_minutes: StrictInt
+    emergency_enabled: StrictBool
 
 
 def create_individual_monitoring_router(service_factory=None):
@@ -63,5 +69,20 @@ def create_individual_monitoring_router(service_factory=None):
         return invoke('set_intent', authorization=authorization,
                       installation_id=installation_id, coin_id=coin_id,
                       intent=request.intent, side=request.side)
+
+    @router.get('/{installation_id}/assets/{coin_id}/alerts')
+    def get_alert_settings(installation_id: str, coin_id: str, response: Response,
+                           authorization: str | None = Header(default=None)):
+        response.headers['Cache-Control'] = 'no-store'
+        return invoke('get_alert_settings', authorization=authorization,
+                      installation_id=installation_id, coin_id=coin_id)
+
+    @router.put('/{installation_id}/assets/{coin_id}/alerts')
+    def set_alert_settings(installation_id: str, coin_id: str, request: MonitoringAlertSettingsRequest,
+                           response: Response, authorization: str | None = Header(default=None)):
+        response.headers['Cache-Control'] = 'no-store'
+        return invoke('set_alert_settings', authorization=authorization,
+                      installation_id=installation_id, coin_id=coin_id,
+                      interval_minutes=request.interval_minutes, emergency_enabled=request.emergency_enabled)
 
     return router

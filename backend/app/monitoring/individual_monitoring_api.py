@@ -12,6 +12,7 @@ from app.monitoring.postgresql_individual_monitoring_store import (
 )
 from app.services.market_data_service import get_coin_list
 from app.monitoring.individual_monitoring_intent import MonitoringIntent
+from app.monitoring.individual_alert_policy import IndividualAlertSettings
 
 
 class IndividualMonitoringService:
@@ -89,6 +90,25 @@ class IndividualMonitoringService:
         except ValueError:
             raise HTTPException(422, 'Intencao ou direcao invalida.') from None
         if not self.store.save_intent(uid=uid, coin_id=coin_id, intent=settings):
+            raise HTTPException(404, 'Ativo nao cadastrado.')
+        return asdict(settings)
+
+
+    def get_alert_settings(self, *, authorization, installation_id, coin_id):
+        uid = self._identity(authorization, installation_id)
+        settings = self.store.load_alert_settings(uid=uid, coin_id=self._coin_id(coin_id))
+        if settings is None:
+            raise HTTPException(404, 'Ativo nao cadastrado.')
+        return asdict(settings)
+
+    def set_alert_settings(self, *, authorization, installation_id, coin_id,
+                           interval_minutes, emergency_enabled):
+        uid = self._identity(authorization, installation_id)
+        try:
+            settings = IndividualAlertSettings(interval_minutes, emergency_enabled)
+        except ValueError:
+            raise HTTPException(422, 'Configuracao de alerta invalida.') from None
+        if not self.store.save_alert_settings(uid=uid, coin_id=self._coin_id(coin_id), settings=settings):
             raise HTTPException(404, 'Ativo nao cadastrado.')
         return asdict(settings)
 
