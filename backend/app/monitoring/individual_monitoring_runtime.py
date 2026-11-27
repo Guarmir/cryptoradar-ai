@@ -79,12 +79,13 @@ class ActiveWatchlistReader:
 
 class IndividualMonitoringRuntime:
     """Single worker owns samples. Market reads shared by canonical ID, never broadcast."""
-    def __init__(self, *, reader, provider, batch_size=50):
+    def __init__(self, *, reader, provider, batch_size=50, alert_delivery=None):
         if type(batch_size) is not int or not 1 <= batch_size <= 50:
             raise ValueError('Invalid batch size.')
         self.reader = reader
         self.provider = provider
         self.batch_size = batch_size
+        self.alert_delivery = alert_delivery
         self._states = {}
         self._snapshot = MappingProxyType({})
         self._interpretations = MappingProxyType({})
@@ -141,6 +142,15 @@ class IndividualMonitoringRuntime:
             (a.uid, a.coin_id): interpret_observation(self._states[a.coin_id],
                                                        MonitoringIntent(a.intent, a.side))
             for a in assets if a.coin_id in fresh})
+        if self.alert_delivery is not None:
+            for asset in assets:
+                key = (asset.uid, asset.coin_id)
+                if key not in self._snapshot:
+                    continue
+                try:
+                    self.alert_delivery.deliver(asset, self._snapshot[key], self._interpretations[key])
+                except Exception:
+                    logger.warning("Individual alert evaluation unavailable.")
         return len(self._snapshot)
 
 
@@ -155,9 +165,15 @@ def create_runtime():
     from app.access.access_api_config import AccessApiConfig
     from app.monitoring.coingecko_monitoring_market_data_provider import CoinGeckoMonitoringMarketDataProvider
     service = create_individual_monitoring_service()
+    scope = AccessApiConfig.from_environment().scope_key
+    delivery = None
+    if os.getenv("CRYPTORADAR_INDIVIDUAL_ALERTS_ENABLED", "").strip().lower() == "true":
+        from app.monitoring.individual_alert_delivery import IndividualAlertDelivery, PostgreSQLIndividualAlertStore
+        from app.push.firebase_admin_push_sender import FirebaseAdminPushSender
+        delivery = IndividualAlertDelivery(store=PostgreSQLIndividualAlertStore(
+            access=service.access, scope_key=scope), sender=FirebaseAdminPushSender())
     return IndividualMonitoringRuntime(reader=ActiveWatchlistReader(access=service.access,
-        scope_key=AccessApiConfig.from_environment().scope_key),
-        provider=CoinGeckoMonitoringMarketDataProvider())
+        scope_key=scope), provider=CoinGeckoMonitoringMarketDataProvider(), alert_delivery=delivery)
 
 
 async def run_loop(stop, *, factory, interval):
