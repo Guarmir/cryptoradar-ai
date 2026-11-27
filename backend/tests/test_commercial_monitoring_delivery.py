@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from app.push.push_device import PushDevice
 from app.push.commercial_monitoring_delivery import (
     CommercialMonitoringDeviceStore, monitoring_delivery_store,
 )
@@ -17,8 +18,8 @@ from app.push.commercial_monitoring_delivery import (
     ('uid', None, False, True, False),
 ])
 def test_delivery_policy(uid, granted, free, pro, expected):
-    device = SimpleNamespace(installation_id='device')
-    devices = Mock(); devices.load_enabled.return_value = (device,)
+    device = PushDevice(installation_id='device', fcm_token='token')
+    devices = Mock(); devices.load_all.return_value = (device,)
     owners = Mock(); owners.load_owner_uid.return_value = uid
     grants = Mock(); grants.has_access.return_value = granted
     rights = SimpleNamespace(free=SimpleNamespace(automatic_market_alerts=free),
@@ -34,9 +35,9 @@ def test_delivery_policy(uid, granted, free, pro, expected):
 
 @pytest.mark.parametrize('failure', ['owner', 'grant'])
 def test_failure_does_not_authorize_and_preserves_other_recipient(failure):
-    first = SimpleNamespace(installation_id='first')
-    second = SimpleNamespace(installation_id='second')
-    devices = Mock(); devices.load_enabled.return_value = (first, second)
+    first = PushDevice(installation_id='first', fcm_token='first')
+    second = PushDevice(installation_id='second', fcm_token='second')
+    devices = Mock(); devices.load_all.return_value = (first, second)
     owners = Mock(); grants = Mock()
     owners.load_owner_uid.side_effect = ([RuntimeError(), None] if failure == 'owner'
                                          else ['uid', None])

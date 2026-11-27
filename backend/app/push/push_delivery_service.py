@@ -32,49 +32,44 @@ class PushDeliveryService:
     ) -> PushDeliveryBatchResult:
         devices = self._device_store.load_enabled()
         outcomes = []
-
-        for device in devices:
-            if not device.can_receive_push:
-                outcomes.append(
-                    PushDeliveryOutcome(
-                        installation_id=device.installation_id,
-                        delivered=False,
-                        error_code="device_not_receivable",
-                    )
-                )
-                continue
-
-            # Only the conservative scanner's three known states are scoped
-            # to these preferences. Other push producers remain unchanged.
-            if (
-                self._notification_preferences_store is not None
-                and message.data.get("type") == "early_movement"
-                and message.data.get("state")
-                in ("observation", "early_movement", "confirmed_movement")
-            ):
+        # Evaluate all aliases before sending, so an opt-out cannot be bypassed
+        # by another enabled registration of the same FCM destination.
+        preference_errors = {}
+        if (
+            self._notification_preferences_store is not None
+            and message.data.get("type") == "early_movement"
+            and message.data.get("state")
+            in ("observation", "early_movement", "confirmed_movement")
+        ):
+            for device in devices:
+                if not device.can_receive_push:
+                    continue
                 try:
                     preferences = self._notification_preferences_store.load(
                         device.installation_id
                     )
+                    if not preferences.allows_state(message.data["state"]):
+                        preference_errors[device.fcm_token] = "notification_preference_disabled"
                 except Exception:
-                    # A database failure must not override an opt-out.
-                    outcomes.append(
-                        PushDeliveryOutcome(
-                            installation_id=device.installation_id,
-                            delivered=False,
-                            error_code="notification_preferences_unavailable",
-                        )
-                    )
-                    continue
-                if not preferences.allows_state(message.data["state"]):
-                    outcomes.append(
-                        PushDeliveryOutcome(
-                            installation_id=device.installation_id,
-                            delivered=False,
-                            error_code="notification_preference_disabled",
-                        )
-                    )
-                    continue
+                    preference_errors[device.fcm_token] = "notification_preferences_unavailable"
+
+        attempted = set()
+        for device in devices:
+            error = None
+            if not device.can_receive_push:
+                error = "device_not_receivable"
+            elif device.fcm_token in preference_errors:
+                error = preference_errors[device.fcm_token]
+            elif device.fcm_token in attempted:
+                error = "duplicate_destination"
+            if error is not None:
+                outcomes.append(PushDeliveryOutcome(
+                    installation_id=device.installation_id,
+                    delivered=False, error_code=error,
+                ))
+                continue
+            # Even a failed/ambiguous send must not trigger a second alias send.
+            attempted.add(device.fcm_token)
 
             try:
                 send_result = self._push_sender.send(
