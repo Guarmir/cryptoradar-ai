@@ -141,7 +141,7 @@ def create_flow():
         challenge=FcmPossessionChallenge(identity_verifier=identity,
             store=PostgreSQLFcmChallengeStore(**kwargs), deliver=deliver_fcm_challenge),
         enrollment=AuthenticatedInstallationEnrollment(identity_verifier=identity,
-            store=PostgreSQLAuthenticatedInstallationStore(**kwargs)),
+            store=PostgreSQLAuthenticatedInstallationStore(**kwargs), recover_existing=True),
         limiter=EnrollmentRateLimiter(**kwargs))
 
 
