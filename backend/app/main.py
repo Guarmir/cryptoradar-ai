@@ -26,6 +26,8 @@ from app.services.routes.push_router import (
     create_push_router,
 )
 
+from app.services.routes.individual_monitoring_router import create_individual_monitoring_router
+
 from app.push.authenticated_installation_api import create_installation_router
 
 from app.services.routes.subscription_router import (
@@ -82,6 +84,7 @@ app.include_router(
 
 
 app.include_router(create_installation_router())
+app.include_router(create_individual_monitoring_router())
 
 
 @app.get("/")
