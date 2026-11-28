@@ -31,6 +31,7 @@ from app.push.authenticated_installation_api import create_installation_router
 from app.services.routes.subscription_router import (
     create_subscription_router,
 )
+from app.services.routes.legal_router import create_legal_router
 
 
 app = FastAPI(
@@ -83,6 +84,7 @@ app.include_router(
 
 app.include_router(create_installation_router())
 app.include_router(create_individual_monitoring_router())
+app.include_router(create_legal_router())
 
 
 @app.get("/")
